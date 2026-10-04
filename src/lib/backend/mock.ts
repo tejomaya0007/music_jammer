@@ -25,12 +25,9 @@ let currentUser: string | null = null;
 
 export const mockBackend: Backend = {
   async signIn() {
+    // send the remembered id so the server can confirm it exists (it may be from an older database)
     const stored = readStore(USER_KEY);
-    if (stored) {
-      currentUser = stored;
-      return stored;
-    }
-    const { id } = await call<{ id: string }>('/signup', { method: 'POST' });
+    const { id } = await call<{ id: string }>('/signup', { method: 'POST', body: JSON.stringify(stored ? { id: stored } : {}) });
     writeStore(USER_KEY, id);
     currentUser = id;
     return id;

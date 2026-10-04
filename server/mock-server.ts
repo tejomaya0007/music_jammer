@@ -132,8 +132,14 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
   }
 
   if (req.method === 'POST' && path === `${BASE}/signup`) {
+    // a browser may remember a user id from an earlier database: recreate it if missing,
+    // so a returning friend keeps their identity instead of hitting a foreign-key error
+    const body = await readBody(req);
+    const wanted = typeof body.id === 'string' && /^[0-9a-f-]{36}$/i.test(body.id) ? body.id : null;
     const id = await serial(async () => {
-      const r = await db.query<{ id: string }>('insert into auth.users default values returning id');
+      const r = wanted
+        ? await db.query<{ id: string }>('insert into auth.users (id) values ($1) on conflict (id) do update set id = excluded.id returning id', [wanted])
+        : await db.query<{ id: string }>('insert into auth.users default values returning id');
       return r.rows[0].id;
     });
     return json(res, 200, { id });
