@@ -17,6 +17,8 @@ export interface Player {
   getDuration(): number;
   /** 0 to 100 */
   setVolume(percent: number): void;
+  /** playback speed, 1 = normal (used for gentle sync nudges) */
+  setPlaybackRate(rate: number): void;
   isPlaying(): boolean;
   onEvent(cb: (e: PlayerEvent) => void): () => void;
   destroy(): void;

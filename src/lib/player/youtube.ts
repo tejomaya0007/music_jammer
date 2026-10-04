@@ -16,6 +16,7 @@ interface YTPlayer {
   getCurrentTime(): number;
   getDuration(): number;
   setVolume(volume: number): void;
+  setPlaybackRate(rate: number): void;
   getPlayerState(): number;
   destroy(): void;
 }
@@ -105,6 +106,7 @@ export async function createYouTubePlayer(mount: HTMLElement): Promise<Player> {
     stop: () => ready && yt.stopVideo(),
     getCurrentTime: () => (ready ? yt.getCurrentTime() : 0),
     getDuration: () => (ready ? yt.getDuration() : 0),
+    setPlaybackRate: (rate) => { if (ready) yt.setPlaybackRate(rate); },
     setVolume: (percent) => { if (ready) yt.setVolume(Math.round(Math.max(0, Math.min(100, percent)))); },
     isPlaying: () => ready && yt.getPlayerState() === YT.PlayerState.PLAYING,
     onEvent(cb) {

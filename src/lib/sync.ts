@@ -56,10 +56,11 @@ export function reorderPosition(prev: number | null, next: number | null): numbe
  * Drift loop decision. Correct only while playing, not buffering, and not
  * within the 2.5 s cool-down after the last correction.
  */
+/** small drift (250 ms to 1.5 s) is fixed by a gentle speed change, not a seek: seeks force a re-buffer and stutter */
 export const DRIFT_TOLERANCE_MS = 250;
-export const DRIFT_COOLDOWN_MS = 1000;
-/** while buffering, small drift waits; a gap this large is corrected anyway (a stuck buffer must not hide drift) */
-export const BUFFER_OVERRIDE_MS = 1500;
+/** a seek is used only for a gap this large, at most once per cooldown */
+export const SEEK_GAP_MS = 1500;
+export const DRIFT_COOLDOWN_MS = 4000;
 
 export function driftCorrectionTarget(input: {
   playerPosMs: number;
@@ -71,8 +72,14 @@ export function driftCorrectionTarget(input: {
 }): number | null {
   if (!input.isPlaying) return null;
   const gap = Math.abs(input.playerPosMs - input.expectedMs);
-  if (input.buffering && gap < BUFFER_OVERRIDE_MS) return null;
+  if (gap <= SEEK_GAP_MS) return null;
   if (input.nowMs - input.lastCorrectionMs < DRIFT_COOLDOWN_MS) return null;
-  if (gap <= DRIFT_TOLERANCE_MS) return null;
   return input.expectedMs;
+}
+
+/** Playback speed that closes a small gap smoothly: 1.05 when behind, 0.95 when ahead, 1 when close. */
+export function driftRate(playerPosMs: number, expectedMs: number): number {
+  const diff = playerPosMs - expectedMs;
+  if (Math.abs(diff) <= DRIFT_TOLERANCE_MS || Math.abs(diff) > SEEK_GAP_MS) return 1;
+  return diff < 0 ? 1.05 : 0.95;
 }

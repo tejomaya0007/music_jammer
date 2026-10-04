@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPlayer, type Player } from '../lib/player';
-import { driftCorrectionTarget, expectedPositionMs } from '../lib/sync';
+import { driftCorrectionTarget, driftRate, expectedPositionMs } from '../lib/sync';
 import { selectCurrentSong, toast, useRoomStore } from '../state/roomStore';
 import { currentPosMs, reportSongEnded, serverNowMs } from '../state/session';
 
@@ -112,12 +112,14 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
       if (!st.unlocked || !st.room || !loadedSongId.current) return;
       const duration = player.getDuration();
       if (duration !== st.durationSec) useRoomStore.setState({ durationSec: duration });
+      const playerPosMs = player.getCurrentTime() * 1000;
+      const expectedMs = expectedPositionMs(
+        { anchorPosMs: st.room.anchor_pos_ms, anchorTimeMs: new Date(st.room.anchor_time).getTime(), isPlaying: st.room.is_playing },
+        serverNowMs(),
+      );
+      // a big gap: one seek (rare, cooled down). A small gap: a gentle speed change, never a seek.
       const target = driftCorrectionTarget({
-        playerPosMs: player.getCurrentTime() * 1000,
-        expectedMs: expectedPositionMs(
-          { anchorPosMs: st.room.anchor_pos_ms, anchorTimeMs: new Date(st.room.anchor_time).getTime(), isPlaying: st.room.is_playing },
-          serverNowMs(),
-        ),
+        playerPosMs, expectedMs,
         isPlaying: st.room.is_playing,
         buffering: buffering.current,
         nowMs: Date.now(),
@@ -125,8 +127,13 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
       });
       if (target !== null) {
         player.seekTo(target / 1000);
+        player.setPlaybackRate(1);
         lastCorrection = Date.now();
         useRoomStore.setState({ lastCorrectionMs: lastCorrection });
+      } else if (st.room.is_playing && !buffering.current) {
+        player.setPlaybackRate(driftRate(playerPosMs, expectedMs));
+      } else {
+        player.setPlaybackRate(1);
       }
     };
     const timer = setInterval(() => check(true), DRIFT_LOOP_MS);

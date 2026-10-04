@@ -90,6 +90,7 @@ export function createFakePlayer(node?: HTMLElement): Player {
     },
     getCurrentTime: () => (videoId ? current() : 0),
     getDuration: () => (videoId ? duration : 0),
+    setPlaybackRate: () => undefined,
     setVolume: (percent) => { volume = Math.max(0, Math.min(100, percent)); expose('volume', String(volume)); },
     isPlaying: () => startedAt !== 0,
     onEvent(cb) {

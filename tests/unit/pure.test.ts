@@ -138,8 +138,9 @@ describe('driftCorrectionTarget', () => {
     expect(driftCorrectionTarget({ ...base, playerPosMs: 9_760 })).toBeNull();
   });
 
-  it('corrects when drift is over 250 ms', () => {
-    expect(driftCorrectionTarget({ ...base, playerPosMs: 10_260, expectedMs: 10_000 })).toBe(10_000);
+  it('corrects (seeks) only past the 1.5 s gap', () => {
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 10_260, expectedMs: 10_000 })).toBeNull();
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 11_600, expectedMs: 10_000 })).toBe(10_000);
   });
 
   it('skips while paused, small drift while buffering, or in cool-down', () => {
