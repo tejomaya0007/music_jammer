@@ -46,9 +46,10 @@ export function Turntable({ song, isPlaying, positionMs, durationMs, onPlayPause
   }, [song?.thumbnail]);
 
   const p = progressOf(positionMs, durationMs);
-  // rest: 90 degrees, standing off the record. Playing: lowered onto the outer groove (153.8 degrees),
+  // rest: standing off the record. Playing: lowered onto the outer groove (153.8 degrees),
   // then drifting inward by 16 degrees over the song (the spec's +24 to +40 swing from the groove base)
-  const arm = isPlaying && song ? 153.8 + 16 * p : 90;
+  // parked up and to the right, clear of the transport buttons below it
+  const arm = isPlaying && song ? 153.8 + 16 * p : -30;
 
   return (
     <div className="tt" role="group" aria-label="Turntable">
