@@ -15,6 +15,7 @@ import { useRoomStore, toast, type RoomState, type Toast } from './roomStore';
 const ACTIVE_KEY = 'jam:active-room';
 const HEARTBEAT_MS = 15_000;
 const CLOCK_EVERY_MS = 5 * 60_000;
+const POLL_MS = 4_000;
 
 type Unsub = () => void;
 let unsubscribeRealtime: Unsub | null = null;
@@ -203,6 +204,9 @@ function startRealtime(roomId: string) {
   });
   timers.push(setInterval(() => void beat(), HEARTBEAT_MS));
   timers.push(setInterval(() => void syncClock(), CLOCK_EVERY_MS));
+  // fallback: the live connection can be blocked (tunnels, some networks). Re-read the room every few
+  // seconds so a pause or skip from another device still reaches this one.
+  timers.push(setInterval(() => void refresh(), POLL_MS));
   visibilityHandler = () => {
     if (document.visibilityState === 'visible') {
       void beat();
