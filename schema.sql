@@ -287,6 +287,19 @@ begin
   end if;
 end $$;
 
+-- host hands the crown to a chosen member (context.md 4.5)
+create or replace function public.transfer_host(p_room uuid, p_user uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare nm text;
+begin
+  perform _assert_host(p_room);
+  select name into nm from room_members where room_id = p_room and user_id = p_user and not is_kicked;
+  if nm is null then raise exception 'That person is not in this room'; end if;
+  if p_user = auth.uid() then return; end if;
+  update rooms set host_id = p_user, last_activity_at = now() where id = p_room;
+  insert into messages (room_id, kind, text) values (p_room, 'system', nm || ' is now the host');
+end $$;
+
 create or replace function public.close_room(p_room uuid)
 returns void language plpgsql security definer set search_path = public as $$
 begin
@@ -346,6 +359,10 @@ create or replace function public.reorder_song(p_song uuid, p_pos double precisi
 returns void language plpgsql security definer set search_path = public as $$
 declare rid uuid;
 begin
+  -- NaN and Infinity sort wrongly and would break the queue order
+  if p_pos is null or p_pos in ('NaN'::double precision, 'Infinity'::double precision, '-Infinity'::double precision) then
+    raise exception 'Invalid position';
+  end if;
   select room_id into rid from songs where id = p_song;
   if rid is null then return; end if;
   perform _assert_member(rid);
@@ -445,7 +462,8 @@ declare
 begin
   perform _assert_member(p_room);
   select * into r from rooms where id = p_room for update;
-  if r.current_song_id is distinct from p_song then return; end if;
+  -- p_song null must not match "nothing selected" (null = null), or it would start playback
+  if p_song is null or r.current_song_id is distinct from p_song then return; end if;
   if p_error then
     select title into t from songs where id = p_song;
     insert into messages (room_id, kind, text)

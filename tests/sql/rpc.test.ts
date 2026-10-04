@@ -229,6 +229,46 @@ describe('host transfer', () => {
   });
 });
 
+describe('transfer_host', () => {
+  it('host hands the crown to a chosen member and the old host becomes a normal member', async () => {
+    const host = await newUser(db);
+    const room = await createRoom(db, host, 'Host');
+    const b = await newUser(db);
+    await joinRoom(db, b, room.code, 'B');
+    await asUser(db, host, 'select public.transfer_host($1, $2)', [room.id, b]);
+    expect((await roomRow(db, room.id)).host_id).toBe(b);
+    expect((await messages(room.id)).map((m) => m.text)).toContain('B is now the host');
+    // old host lost admin powers
+    const r = await tryAs(db, host, 'select public.kick_member($1, $2)', [room.id, b]);
+    expect(r).toEqual({ ok: false, error: 'Only the host can do that' });
+    // new host has them
+    await asUser(db, b, 'select public.close_room($1)', [room.id]);
+    expect((await roomRow(db, room.id)).status).toBe('closed');
+  });
+
+  it('only the host can transfer', async () => {
+    const host = await newUser(db);
+    const room = await createRoom(db, host, 'Host');
+    const b = await newUser(db);
+    await joinRoom(db, b, room.code, 'B');
+    const r = await tryAs(db, b, 'select public.transfer_host($1, $2)', [room.id, b]);
+    expect(r).toEqual({ ok: false, error: 'Only the host can do that' });
+  });
+
+  it('cannot transfer to someone who is not in the room or was kicked', async () => {
+    const host = await newUser(db);
+    const room = await createRoom(db, host, 'Host');
+    const b = await newUser(db);
+    await joinRoom(db, b, room.code, 'B');
+    await asUser(db, host, 'select public.kick_member($1, $2)', [room.id, b]);
+    const kicked = await tryAs(db, host, 'select public.transfer_host($1, $2)', [room.id, b]);
+    expect(kicked).toEqual({ ok: false, error: 'That person is not in this room' });
+    const stranger = await newUser(db);
+    const none = await tryAs(db, host, 'select public.transfer_host($1, $2)', [room.id, stranger]);
+    expect(none).toEqual({ ok: false, error: 'That person is not in this room' });
+  });
+});
+
 describe('kick and close are host-only', () => {
   it('a non-host cannot kick', async () => {
     const host = await newUser(db);
@@ -403,6 +443,18 @@ describe('reorder_song', () => {
     expect((await songs(room.id)).map((s) => s.title)).toEqual(['C', 'A', 'B']);
     await asUser(db, host, 'select public.reorder_song($1, $2)', [a, 10]);
     expect((await songs(room.id)).map((s) => s.title)).toEqual(['C', 'B', 'A']);
+  });
+
+  it('rejects NaN, Infinity and null positions (they would corrupt the queue order)', async () => {
+    const host = await newUser(db);
+    const room = await createRoom(db, host, 'Host');
+    const a = await addSong(db, host, room.id, SONG_IDS[0], 'A');
+    await addSong(db, host, room.id, SONG_IDS[1], 'B');
+    for (const bad of ['NaN', 'Infinity', '-Infinity', null]) {
+      const r = await tryAs(db, host, 'select public.reorder_song($1, $2::double precision)', [a, bad]);
+      expect(r.ok, String(bad)).toBe(false);
+    }
+    expect((await songs(room.id)).map((s) => s.title)).toEqual(['A', 'B']);
   });
 
   it('dragging the playing song does not interrupt it', async () => {
@@ -617,6 +669,18 @@ describe('song_ended', () => {
     await asUser(db, host, 'select public.song_ended($1, $2, true)', [room.id, a]);
     expect((await roomRow(db, room.id)).current_song_id).toBe(b);
     expect((await messages(room.id)).map((m) => m.text)).toContain('Couldn\'t play "Broken Song", skipped');
+  });
+
+  it('a null song id never starts playback (null is not "nothing selected")', async () => {
+    const host = await newUser(db);
+    const room = await createRoom(db, host, 'Host');
+    await addSong(db, host, room.id, SONG_IDS[0]);
+    await asUser(db, host, 'select public.next_song($1, null)', [room.id]); // nothing selected now
+    expect((await roomRow(db, room.id)).current_song_id).toBeNull();
+    await asUser(db, host, 'select public.song_ended($1, null, false)', [room.id]);
+    const row = await roomRow(db, room.id);
+    expect(row.current_song_id).toBeNull();
+    expect(row.is_playing).toBe(false);
   });
 
   it('a report for a song that is not current is ignored', async () => {
