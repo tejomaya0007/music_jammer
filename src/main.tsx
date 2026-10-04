@@ -11,6 +11,9 @@ import './styles/screens.css';
 import './styles/stage.css';
 import { App } from './App';
 import { useRoomStore } from './state/roomStore';
+import { initInstall } from './lib/install';
+
+initInstall();
 
 // test builds only: lets e2e tests read the shared room state directly
 if (import.meta.env.MODE === 'mock' || import.meta.env.MODE === 'mock-real') {

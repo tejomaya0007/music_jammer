@@ -3,6 +3,7 @@ import { Avatar } from '../components/avatar/Avatar';
 import { createRoom } from '../state/session';
 import { toast } from '../state/roomStore';
 import { readProfile } from '../lib/profile';
+import { InstallCard } from '../components/InstallCard';
 
 /** Home: profile chip, two large cards (start a room, join with a code). */
 export function Home({ onJoin, onEditProfile }: { onJoin: () => void; onEditProfile: () => void }) {
@@ -38,6 +39,7 @@ export function Home({ onJoin, onEditProfile }: { onJoin: () => void; onEditProf
             <span className="action-sub">Got a code or link?</span>
           </button>
         </div>
+        <InstallCard />
       </section>
     </main>
   );

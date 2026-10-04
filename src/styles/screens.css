@@ -340,3 +340,8 @@
   .room-header .wordmark.sm .wordmark-text { font-size: 1.05rem; white-space: nowrap; }
   .room-header .btn.secondary-sm { padding: 0 var(--sp-3); }
 }
+
+/* install (Home) */
+.install { justify-self: center; min-height: 44px; padding: 0 var(--sp-4); border: 0; background: none; color: var(--paper-300); font-size: var(--fs-small); text-decoration: underline; text-underline-offset: 4px; }
+.install:hover { color: var(--paper-100); }
+.install-hint { justify-self: center; color: var(--paper-500); font-size: var(--fs-small); text-align: center; }
