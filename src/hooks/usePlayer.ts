@@ -5,6 +5,11 @@ import { selectCurrentSong, toast, useRoomStore } from '../state/roomStore';
 import { currentPosMs, reportSongEnded, serverNowMs } from '../state/session';
 
 const DRIFT_LOOP_MS = 1000;
+/**
+ * A freshly loaded video reports a stale or zero clock until it starts. Seeking then restarts the load,
+ * which is the stammer on joined phones. Leave it alone until it plays (or this much time passes).
+ */
+const SETTLE_MS = 8_000;
 
 /**
  * Connects the video player to the shared room state.
@@ -15,6 +20,7 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
   const [player, setPlayer] = useState<Player | null>(null);
   const loadedSongId = useRef<string | null>(null);
   const buffering = useRef(false);
+  const settleUntil = useRef(0);
   const song = useRoomStore(selectCurrentSong);
   const unlocked = useRoomStore((s) => s.unlocked);
   const isPlaying = useRoomStore((s) => s.room?.is_playing ?? false);
@@ -39,7 +45,10 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
       unsub = created.onEvent((e) => {
         const id = loadedSongId.current;
         if (e.type === 'buffering') buffering.current = true;
-        if (e.type === 'playing' || e.type === 'paused') buffering.current = false;
+        if (e.type === 'playing' || e.type === 'paused') {
+          buffering.current = false;
+          settleUntil.current = 0;
+        }
         if (!id) return;
         // a skip is reported only for a real end (near the length) ...
         if (e.type === 'ended') {
@@ -87,6 +96,7 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
     const expectedSec = currentPosMs() / 1000;
     if (loadedSongId.current !== song.id) {
       loadedSongId.current = song.id;
+      settleUntil.current = Date.now() + SETTLE_MS;
       player.load(song.video_id, expectedSec, isPlaying);
       // the seek bar needs the length straight away, or it clamps to 0:01 until the next tick
       useRoomStore.setState({ durationSec: player.getDuration() });
@@ -98,7 +108,8 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
     else player.pause();
     // an explicit change (seek, pause, skip) corrects at once, no cool-down
     const driftMs = Math.abs(player.getCurrentTime() * 1000 - expectedSec * 1000);
-    if (driftMs > 300) player.seekTo(expectedSec);
+    // while the new video is still starting, its clock is not real yet: wait for it to settle
+    if (driftMs > 300 && Date.now() >= settleUntil.current) player.seekTo(expectedSec);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the shared state fields
   }, [player, unlocked, song?.id, song?.video_id, isPlaying, anchorPos, anchorTime, version]);
 
@@ -132,6 +143,10 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
         rate.current = r;
         player.setPlaybackRate(r);
       };
+      if (Date.now() < settleUntil.current) {
+        setRate(1);
+        return;
+      }
       if (target !== null) {
         player.seekTo(target / 1000);
         setRate(1);
