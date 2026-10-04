@@ -49,8 +49,14 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
         // ... or for a video that cannot play here at all. Other errors (a phone blocking autoplay,
         // a hiccup in the browser) must not skip the room: tell this person and let them retry.
         if (e.type === 'error') {
-          if (e.code === 100 || e.code === 101 || e.code === 150) void reportSongEnded(id, true);
-          else toast('Could not play here. Tap Join the music to try again.', 'error');
+          // show the YouTube error number so the cause is visible (also in the browser console)
+          console.warn('[jam] YouTube error', e.code, 'for song', id);
+          if (e.code === 100 || e.code === 101 || e.code === 150) {
+            toast(`YouTube blocks this video here (error ${e.code}). Skipping.`, 'error');
+            void reportSongEnded(id, true);
+          } else {
+            toast(`Could not play here (YouTube error ${e.code ?? 'unknown'}). Tap Join the music to try again.`, 'error');
+          }
         }
       });
       setPlayer(created);
