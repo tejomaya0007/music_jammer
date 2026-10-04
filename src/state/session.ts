@@ -145,16 +145,18 @@ function applySnapshot(snap: RoomSnapshot) {
   if (before.room && before.userId && before.room.host_id !== before.userId && snap.room.host_id === before.userId) {
     toast("You're now the host");
   }
-  // unread badge: count new chat lines while the drawer is closed
+  // unread badge: other people's chat lines that arrived while the drawer is closed
+  // (system lines like "X joined" and my own messages do not count)
   const idx = snap.messages.findIndex((m) => m.id === lastMessageId);
-  const fresh = lastMessageId === null ? 0 : idx === -1 ? snap.messages.length : snap.messages.length - idx - 1;
+  const arrived = lastMessageId === null ? [] : snap.messages.slice(idx === -1 ? 0 : idx + 1);
+  const newFromOthers = arrived.filter((m) => m.kind === 'user' && m.user_id !== before.userId).length;
   lastMessageId = snap.messages.at(-1)?.id ?? lastMessageId;
   patch({
     room: snap.room,
     songs: snap.songs,
     members: snap.members,
     messages: snap.messages,
-    unread: before.chatOpen ? 0 : before.unread + Math.max(0, fresh),
+    unread: before.chatOpen ? 0 : before.unread + newFromOthers,
   });
 }
 
@@ -345,7 +347,8 @@ export function currentPosMs(): number {
   if (!room) return 0;
   const anchorTime = new Date(room.anchor_time).getTime();
   const elapsed = room.is_playing ? Math.max(0, serverNowMs() - anchorTime) : 0;
-  return Math.max(0, room.anchor_pos_ms + elapsed);
+  const pos = room.anchor_pos_ms + elapsed;
+  return Number.isFinite(pos) ? Math.max(0, pos) : 0;
 }
 
 // ----- chat -----

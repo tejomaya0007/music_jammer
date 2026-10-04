@@ -1,17 +1,15 @@
 import { useMemo, useRef, useState } from 'react';
 import { usePlayer } from '../hooks/usePlayer';
-import { useRoomStore, selectCurrentSong, toast } from '../state/roomStore';
+import { useMediaSession } from '../hooks/useMediaSession';
+import { useRoomStore, selectCurrentSong, selectOnlineCount, toast } from '../state/roomStore';
 import { leaveRoom } from '../state/session';
+import { shareUrl } from '../lib/share';
 import { NowPlaying } from './NowPlaying';
 import { Queue } from './Queue';
 import { ChatBar } from './Chat';
-import { PeopleSheet, selectOnlineCount } from './People';
+import { PeopleSheet } from './People';
 import { Avatar } from './parts';
 import { CrownIcon, ShareIcon, PeopleIcon } from './icons';
-
-export function shareUrl(code: string): string {
-  return `${window.location.origin}${window.location.pathname}?join=${code}`;
-}
 
 export function Room() {
   const code = useRoomStore((s) => s.code);
@@ -25,6 +23,7 @@ export function Room() {
 
   const mountRef = useRef<HTMLDivElement>(null);
   usePlayer(mountRef);
+  useMediaSession();
 
   const share = async () => {
     if (!code) return;

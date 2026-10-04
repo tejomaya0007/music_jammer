@@ -4,7 +4,7 @@ import { createRoom, getStoredName, joinByCode } from '../state/session';
 /** First screen: pick a name, then start a jam or join one by code. */
 export function Home({ inviteCode }: { inviteCode: string | null }) {
   const [name, setName] = useState(getStoredName());
-  const [code, setCode] = useState(inviteCode ?? '');
+  const [code, setCode] = useState((inviteCode ?? '').toUpperCase());
   const [busy, setBusy] = useState(false);
 
   const submit = async (fn: () => Promise<unknown>) => {

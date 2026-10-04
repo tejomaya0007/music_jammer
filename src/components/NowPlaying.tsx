@@ -44,11 +44,11 @@ export function NowPlaying({ mountRef }: { mountRef: RefObject<HTMLDivElement | 
         <div className="player-mount" ref={mountRef} />
 
         {song && !unlocked && (
-          <button className="tap-join" onClick={unlockMusic}>
+          <div className="tap-join" role="group" aria-label="Start playback">
             <strong>Tap to join the music</strong>
             <span>Browsers need one tap before sound can play.</span>
-            <span className="btn primary">Join in</span>
-          </button>
+            <button className="btn primary" onClick={unlockMusic}>Join in</button>
+          </div>
         )}
 
         {song && unlocked && (
@@ -74,9 +74,9 @@ export function NowPlaying({ mountRef }: { mountRef: RefObject<HTMLDivElement | 
             type="range"
             min={0}
             max={total || 1}
-            step={0.5}
+            step={0.1}
             value={shown}
-            disabled={!song}
+            disabled={!song || !total}
             aria-label="Seek"
             style={{ ['--p' as string]: `${pct}%` }}
             onChange={(e) => setDragging(Number(e.target.value))}

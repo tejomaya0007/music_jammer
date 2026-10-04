@@ -72,6 +72,10 @@ export function toast(text: string, tone: Toast['tone'] = 'info') {
 export const selectCurrentSong = (s: RoomState): SongRow | null =>
   s.songs.find((x) => x.id === s.room?.current_song_id) ?? null;
 
+/** Active members who are online. Returns a number, so it is safe inside a selector. */
+export const selectOnlineCount = (s: RoomState): number =>
+  s.members.filter((m) => !m.is_kicked && s.online.includes(m.user_id)).length;
+
 export const selectHostName = (s: RoomState): string | null => {
   const host = s.members.find((m) => m.user_id === s.room?.host_id);
   return host?.name ?? null;

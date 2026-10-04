@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useRoomStore, type RoomState } from '../state/roomStore';
+import { useRoomStore } from '../state/roomStore';
 import { closeRoom, kick, transferHost } from '../state/session';
 import { CloseIcon, CrownIcon } from './icons';
 import { Avatar, Sheet } from './parts';
-
-/** Number of active members who are online. Returns a number, so it is safe in a selector. */
-export const selectOnlineCount = (s: RoomState) => s.members.filter((m) => !m.is_kicked && s.online.includes(m.user_id)).length;
 
 /** Members, presence, and (for the host) the admin actions. */
 export function PeopleSheet({ onClose }: { onClose: () => void }) {

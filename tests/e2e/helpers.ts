@@ -41,7 +41,7 @@ export async function joinByCode(page: Page, name: string, code: string) {
   await page.getByLabel('Your name').fill(name);
   await page.getByLabel('Room code').fill(code);
   await page.getByRole('button', { name: 'Join', exact: true }).click();
-  await expect(page.locator('.code-chip')).toHaveText(code);
+  await expect(page.locator('.code-chip')).toHaveText(code.toUpperCase());
 }
 
 /** Share link: opening it with no name stored opens home with the code filled. */
@@ -51,12 +51,15 @@ export async function joinByLink(page: Page, code: string, name?: string) {
     await page.getByLabel('Your name').fill(name);
     await page.getByRole('button', { name: 'Join', exact: true }).click();
   }
-  await expect(page.locator('.code-chip')).toHaveText(code);
+  await expect(page.locator('.code-chip')).toHaveText(code.toUpperCase());
 }
 
+/** Wait for the browser-autoplay gate to show, then tap it, the way a friend would. */
 export async function tapToJoinMusic(page: Page) {
   const tap = page.getByRole('button', { name: 'Join in' });
-  if (await tap.isVisible().catch(() => false)) await tap.click();
+  await expect(tap).toBeVisible();
+  await tap.click();
+  await expect(tap).toHaveCount(0);
 }
 
 export async function addLinks(page: Page, text: string) {

@@ -15,7 +15,9 @@ export const FAKE_BROKEN_PLAY = 'BROKENPLAY1';
 const DEFAULT_LEN = 180;
 const SHORT_LEN = 8;
 
-export function createFakePlayer(): Player {
+export function createFakePlayer(node?: HTMLElement): Player {
+  // the state is mirrored onto the DOM so tests can see what the "player" is doing
+  const expose = (k: string, v: string) => node?.setAttribute(`data-${k}`, v);
   let videoId: string | null = null;
   let posSec = 0; // position when last paused/seeked/loaded
   let startedAt = 0; // wall clock ms when playback last started (0 = paused)
@@ -48,6 +50,8 @@ export function createFakePlayer(): Player {
       posSec = Math.max(0, startSec);
       ended = false;
       startedAt = 0;
+      expose('video', id);
+      expose('duration', String(duration));
       if (id === FAKE_BROKEN_PLAY) {
         setTimeout(() => emit({ type: 'error' }), 30);
         return;
@@ -62,12 +66,14 @@ export function createFakePlayer(): Player {
     play() {
       if (!videoId || startedAt || ended) return;
       startedAt = now();
+      expose('state', 'playing');
       emit({ type: 'playing' });
     },
     pause() {
       if (!startedAt) return;
       posSec = current();
       startedAt = 0;
+      expose('state', 'paused');
       emit({ type: 'paused' });
     },
     seekTo(sec) {

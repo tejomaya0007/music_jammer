@@ -67,6 +67,8 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
     if (loadedSongId.current !== song.id) {
       loadedSongId.current = song.id;
       player.load(song.video_id, expectedSec, isPlaying);
+      // the seek bar needs the length straight away, or it clamps to 0:01 until the next tick
+      useRoomStore.setState({ durationSec: player.getDuration() });
       return;
     }
     if (isPlaying && !player.isPlaying()) player.play();

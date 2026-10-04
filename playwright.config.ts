@@ -15,6 +15,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'retain-on-failure',
+    actionTimeout: 15_000, // fail fast with a clear message instead of waiting on an unclickable element
     viewport: { width: 412, height: 860 },
   },
   projects: [{ name: 'phone-chromium', use: { ...devices['Pixel 7'], browserName: 'chromium', viewport: { width: 412, height: 860 } } }],
