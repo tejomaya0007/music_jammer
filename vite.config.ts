@@ -1,13 +1,16 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // Local/test backend (server/start.ts). Only used when VITE_BACKEND=mock.
 const mockProxy = { '/mock-api': { target: 'http://127.0.0.1:8787', changeOrigin: false } };
 
-export default defineConfig({
+// the real-YouTube dev mode is served over HTTPS: YouTube refuses to embed players for plain-http LAN addresses (error 150)
+export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
+    ...(mode === 'mock-real' ? [basicSsl()] : []),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'],
@@ -45,4 +48,4 @@ export default defineConfig({
   server: { port: 5173, strictPort: false, proxy: mockProxy },
   preview: { port: 4173, strictPort: true, proxy: mockProxy },
   build: { target: 'es2020', sourcemap: true },
-});
+}));
