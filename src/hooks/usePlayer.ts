@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPlayer, type Player } from '../lib/player';
-import { driftCorrectionTarget, driftRate, expectedPositionMs } from '../lib/sync';
+import { driftCorrectionTarget, expectedPositionMs, nextDriftRate } from '../lib/sync';
 import { selectCurrentSong, toast, useRoomStore } from '../state/roomStore';
 import { currentPosMs, reportSongEnded, serverNowMs } from '../state/session';
 
@@ -153,7 +153,7 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
         lastCorrection = Date.now();
         useRoomStore.setState({ lastCorrectionMs: lastCorrection });
       } else if (st.room.is_playing && !buffering.current) {
-        setRate(driftRate(playerPosMs, expectedMs));
+        setRate(nextDriftRate(rate.current, playerPosMs, expectedMs));
       } else {
         setRate(1);
       }

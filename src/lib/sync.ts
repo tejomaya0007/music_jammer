@@ -83,3 +83,18 @@ export function driftRate(playerPosMs: number, expectedMs: number): number {
   if (Math.abs(diff) <= DRIFT_TOLERANCE_MS || Math.abs(diff) > SEEK_GAP_MS) return 1;
   return diff < 0 ? 1.05 : 0.95;
 }
+
+/** speed turns off only once the gap is back under this; between the two lines the current speed holds */
+export const RATE_OFF_MS = 100;
+
+/**
+ * Speed with hysteresis. Judging only against the 250 ms line flips speed 1 -> 1.05 -> 1 on every
+ * tick near that line, and each flip makes phones stutter or flicker. So: start a nudge past 250 ms,
+ * stop it under 100 ms, keep whatever speed is set in between.
+ */
+export function nextDriftRate(prevRate: number, playerPosMs: number, expectedMs: number): number {
+  const gap = Math.abs(playerPosMs - expectedMs);
+  if (gap <= RATE_OFF_MS) return 1;
+  if (gap <= DRIFT_TOLERANCE_MS) return prevRate;
+  return driftRate(playerPosMs, expectedMs);
+}
