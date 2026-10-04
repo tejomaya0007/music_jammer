@@ -6,7 +6,7 @@
 import { api, fetchTitle, type RoomSnapshot } from '../lib/api';
 import { estimateClockOffset, reorderPosition, type ClockSample } from '../lib/sync';
 import { parseVideoLinks } from '../lib/link';
-import { QUEUE_CAP, CHAT_MAX } from '../lib/config';
+import { BACKEND, QUEUE_CAP, CHAT_MAX } from '../lib/config';
 import { readStore, writeStore } from '../lib/storage';
 import { readProfile, saveProfile } from '../lib/profile';
 import { formatAvatar, randomAvatar } from '../lib/avatars';
@@ -15,7 +15,8 @@ import { useRoomStore, toast, type RoomState, type Toast } from './roomStore';
 const ACTIVE_KEY = 'jam:active-room';
 const HEARTBEAT_MS = 15_000;
 const CLOCK_EVERY_MS = 60_000;
-const POLL_MS = 4_000;
+/** fallback re-read: fast on the mock backend (its live stream does not pass through tunnels), slower on Supabase */
+const POLL_MS = BACKEND === 'mock' ? 1_000 : 4_000;
 
 type Unsub = () => void;
 let unsubscribeRealtime: Unsub | null = null;
