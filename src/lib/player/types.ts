@@ -1,6 +1,7 @@
 /** What the sync code needs from a video player. Implemented by youtube.ts and fake.ts. */
 
-export type PlayerEvent = { type: 'ended' } | { type: 'error' } | { type: 'buffering' } | { type: 'playing' } | { type: 'paused' };
+/** code: the YouTube error number (100/101/150 mean the video itself cannot play here) */
+export type PlayerEvent = { type: 'ended' } | { type: 'error'; code?: number } | { type: 'buffering' } | { type: 'playing' } | { type: 'paused' };
 
 export interface Player {
   /** Load a video at a start position. autoplay=false cues it (paused). */

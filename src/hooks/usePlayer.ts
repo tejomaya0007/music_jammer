@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { createPlayer, type Player } from '../lib/player';
 import { driftCorrectionTarget, expectedPositionMs } from '../lib/sync';
-import { useRoomStore, selectCurrentSong } from '../state/roomStore';
+import { selectCurrentSong, toast, useRoomStore } from '../state/roomStore';
 import { currentPosMs, reportSongEnded, serverNowMs } from '../state/session';
 
 const DRIFT_LOOP_MS = 2000;
@@ -41,8 +41,17 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
         if (e.type === 'buffering') buffering.current = true;
         if (e.type === 'playing' || e.type === 'paused') buffering.current = false;
         if (!id) return;
-        if (e.type === 'ended') void reportSongEnded(id, false);
-        if (e.type === 'error') void reportSongEnded(id, true);
+        // a skip is reported only for a real end (near the length) ...
+        if (e.type === 'ended') {
+          const dur = created.getDuration();
+          if (dur > 0 && created.getCurrentTime() >= dur - 2) void reportSongEnded(id, false);
+        }
+        // ... or for a video that cannot play here at all. Other errors (a phone blocking autoplay,
+        // a hiccup in the browser) must not skip the room: tell this person and let them retry.
+        if (e.type === 'error') {
+          if (e.code === 100 || e.code === 101 || e.code === 150) void reportSongEnded(id, true);
+          else toast('Could not play here. Tap Join the music to try again.', 'error');
+        }
       });
       setPlayer(created);
     });

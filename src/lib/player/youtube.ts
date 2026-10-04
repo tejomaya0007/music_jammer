@@ -86,7 +86,7 @@ export async function createYouTubePlayer(mount: HTMLElement): Promise<Player> {
           else if (e.data === YT.PlayerState.PAUSED) emit({ type: 'paused' });
           else if (e.data === YT.PlayerState.BUFFERING) emit({ type: 'buffering' });
         },
-        onError: () => emit({ type: 'error' }),
+        onError: (e) => emit({ type: 'error', code: e.data }),
       },
     });
   });

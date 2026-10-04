@@ -54,7 +54,7 @@ export function createFakePlayer(node?: HTMLElement): Player {
       expose('video', id);
       expose('duration', String(duration));
       if (id === FAKE_BROKEN_PLAY) {
-        setTimeout(() => emit({ type: 'error' }), 30);
+        setTimeout(() => emit({ type: 'error', code: 150 }), 30); // 150: embedding not allowed, so the room skips
         return;
       }
       if (autoplay) {

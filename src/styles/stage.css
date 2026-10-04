@@ -187,7 +187,7 @@
   position: relative; width: 100%; aspect-ratio: 400 / 253; border-radius: 14px; overflow: hidden;
   background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0 2px, transparent 2px 5px), var(--shell-800);
   box-shadow: var(--shadow-2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  display: grid; grid-template-rows: 52% 1fr 14%;
+  display: grid; grid-template-rows: 40% 1fr 12%;
 }
 .cs-shell::before, .cs-shell::after {
   content: ""; position: absolute; width: 10px; height: 10px; border-radius: 50%; background: #1a1a1a; box-shadow: inset 0 0 0 1px #000;
@@ -195,15 +195,15 @@
 }
 .cs-shell::after { left: auto; right: 8px; top: auto; bottom: 8px; }
 .cs-label {
-  position: relative; margin: 6% 6% 0; border-radius: 6px; background: #e8dcc3; color: #2b1b12;
-  display: grid; grid-template-columns: 20% minmax(0, 1fr) auto; align-items: center; gap: 4%; padding: 3% 4%;
+  position: relative; margin: 5% 7% 0; border-radius: 5px; background: #e8dcc3; color: #2b1b12;
+  display: grid; grid-template-columns: 17% minmax(0, 1fr) auto; align-items: center; gap: 3%; padding: 2% 3%;
   overflow: hidden; min-height: 0;
 }
 .cs-thumb { aspect-ratio: 1; border-radius: 4px; overflow: hidden; background: #d9ccb0; }
 .cs-thumb img { width: 100%; height: 100%; object-fit: cover; filter: sepia(0.35) saturate(0.9) contrast(1.05); display: block; }
 .cs-text { display: grid; min-width: 0; gap: 2px; }
 .cs-title {
-  font-family: var(--font-typewriter); font-size: clamp(11px, 2.4vw, 15px); line-height: 1.2;
+  font-family: var(--font-typewriter); font-size: clamp(9px, 2vw, 12px); line-height: 1.2;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .cs-side { font-family: var(--font-typewriter); font-size: 10px; opacity: 0.7; }
