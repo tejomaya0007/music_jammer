@@ -150,7 +150,14 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
     const fn = path.slice(`${BASE}/rpc/`.length);
     const args = await readBody(req);
     try {
-      const result = await serial(() => handleRpc(fn, args, user));
+      // a stale browser may send a user id this database has never seen: create that user first,
+      // the way a returning anonymous session would be re-established
+      const result = await serial(async () => {
+        if (/^[0-9a-f-]{36}$/i.test(user)) {
+          await db.query('insert into auth.users (id) values ($1) on conflict (id) do nothing', [user]);
+        }
+        return handleRpc(fn, args, user);
+      });
       const room = typeof args.p_room === 'string' ? [args.p_room] : null;
       broadcastChanged(room);
       return json(res, 200, { data: result });

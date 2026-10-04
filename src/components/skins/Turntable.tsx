@@ -1,15 +1,50 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useSpin } from '../../hooks/useSpin';
 import { progressOf, type SkinProps } from './types';
 import { NextGlyph, PauseGlyph, PlayGlyph, PrevGlyph } from './glyphs';
 
+const SLIDE_MS = 560;
+
 /**
  * Turntable: brushed plinth seen from above, a vinyl platter that spins (33 and a third rpm),
- * a tonearm that moves across the record as the song plays. Fader = volume.
+ * a tonearm that moves across the record as the song plays. When the song changes, the old disc
+ * slides off to the left and the new one slides in from the right.
  */
-export function Turntable({ song, isPlaying, positionMs, durationMs, volume, onPlayPause, onNext, onPrev, onVolume }: SkinProps) {
+export function Turntable({ song, isPlaying, positionMs, durationMs, onPlayPause, onNext, onPrev }: SkinProps) {
   const platter = useRef<HTMLDivElement>(null);
+  const disc = useRef<HTMLDivElement>(null);
+  const lastThumb = useRef<string | null>(song?.thumbnail ?? null);
   useSpin(isPlaying, platter);
+
+  // slide the disc on a song change (Web Animations, so nothing re-renders per frame)
+  useEffect(() => {
+    const thumb = song?.thumbnail ?? null;
+    const el = disc.current;
+    if (!el || thumb === lastThumb.current) return;
+    const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const previous = lastThumb.current;
+    lastThumb.current = thumb;
+    if (reduced) return;
+
+    if (previous) {
+      // a copy of the old disc (it still shows the previous artwork) slides out to the left
+      const out = el.cloneNode(true) as HTMLDivElement;
+      const img = out.querySelector('img');
+      if (img) img.setAttribute('src', previous);
+      out.setAttribute('aria-hidden', 'true');
+      el.parentElement?.appendChild(out);
+      const leave = out.animate(
+        [{ transform: 'translateX(0)', opacity: 1 }, { transform: 'translateX(-115%)', opacity: 0.2 }],
+        { duration: SLIDE_MS, easing: 'cubic-bezier(.3,.7,.4,1)', fill: 'forwards' },
+      );
+      leave.onfinish = () => out.remove();
+    }
+    el.animate(
+      [{ transform: 'translateX(115%)', opacity: 0.2 }, { transform: 'translateX(0)', opacity: 1 }],
+      { duration: SLIDE_MS, easing: 'cubic-bezier(.2,.8,.2,1)' },
+    );
+  }, [song?.thumbnail]);
+
   const p = progressOf(positionMs, durationMs);
   // rest: 90 degrees, standing off the record. Playing: lowered onto the outer groove (153.8 degrees),
   // then drifting inward by 16 degrees over the song (the spec's +24 to +40 swing from the groove base)
@@ -18,10 +53,12 @@ export function Turntable({ song, isPlaying, positionMs, durationMs, volume, onP
   return (
     <div className="tt" role="group" aria-label="Turntable">
       <div className="tt-plinth">
-        <div className="tt-platter" ref={platter}>
-          <div className="tt-grooves" />
-          <div className="tt-label">
-            {song?.thumbnail && <img src={song.thumbnail} alt="" />}
+        <div className="tt-disc" ref={disc}>
+          <div className="tt-platter" ref={platter}>
+            <div className="tt-grooves" />
+            <div className="tt-label">
+              {song?.thumbnail && <img src={song.thumbnail} alt="" />}
+            </div>
           </div>
         </div>
         {/* sheen stays still while the disc turns: light is fixed, the record moves under it */}
@@ -42,18 +79,6 @@ export function Turntable({ song, isPlaying, positionMs, durationMs, volume, onP
           </div>
         </div>
 
-        <div className="tt-fader">
-          <input
-            className="range vertical"
-            type="range"
-            min={0}
-            max={100}
-            value={volume}
-            aria-label="Volume"
-            aria-valuetext={`${volume} percent`}
-            onChange={(e) => onVolume(Number(e.target.value))}
-          />
-        </div>
         <span className="tt-power" aria-hidden="true"><span /></span>
       </div>
     </div>

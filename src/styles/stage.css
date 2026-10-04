@@ -35,9 +35,17 @@
   position: relative; width: 100%; margin: 0 auto;
   display: grid; place-items: center; min-height: 0;
 }
-.device-slot.skin-turntable { width: clamp(280px, min(92vw, 60dvh), 520px); }
-.device-slot.skin-cassette { width: clamp(300px, min(92vw, 64dvh), 560px); }
-.device-slot.skin-ipod { width: clamp(220px, min(70vw, 50dvh * 0.6), 320px); }
+/* the device is sized from the screen height: the page keeps --reserve px for the title, seek and
+   volume, so a device can never grow down over them. --ratio is the device's width to height. */
+.device-slot {
+  --ratio: 1.3;
+  --reserve: 430px;
+  width: max(240px, min(100%, 560px, calc((100dvh - var(--reserve)) * var(--ratio))));
+}
+.device-slot.skin-turntable { --ratio: 1.304; }
+.device-slot.skin-cassette { --ratio: 1.58; --reserve: 510px; }
+.device-slot.skin-ipod { --ratio: 0.6; }
+.tt-disc { position: absolute; inset: 0; pointer-events: none; }
 .device-slot::after {
   content: ""; position: absolute; left: 10%; right: 10%; bottom: -8px; height: 18px; border-radius: 50%;
   background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), transparent); filter: blur(8px); pointer-events: none;
@@ -139,7 +147,8 @@
   position: absolute; left: 84.17%; top: 20.65%; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #fff, #8f8c86 70%); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
 }
-.tt-controls { position: absolute; left: 6%; bottom: 7%; display: flex; align-items: center; gap: var(--sp-3); }
+/* transport sits in the empty right side of the plinth, clear of the record */
+.tt-controls { position: absolute; right: 6%; bottom: 6%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .tt-btn {
   display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; border: 0;
   background: radial-gradient(circle at 35% 30%, #fbfaf7, #b9b5ad 80%); color: #2b1b12;
@@ -208,14 +217,13 @@
   overflow: hidden;
 }
 .cs-pack {
-  position: absolute; left: 22%; top: 50%; border-radius: 50%; transform: translate(-50%, -50%);
+  position: absolute; left: 22%; top: 50%; aspect-ratio: 1; height: auto; border-radius: 50%; transform: translate(-50%, -50%);
   background: var(--tape-brown); box-shadow: inset 0 0 0 1px #000; transition: width var(--t-slow) linear, height var(--t-slow) linear;
 }
 .cs-pack.right { left: 78%; }
 .cs-hub {
   position: absolute; left: 22%; top: 50%; width: 36%; aspect-ratio: 1; margin: 0; transform: translate(-50%, -50%);
-  border-radius: 50%; background: radial-gradient(circle, #e9e7e2 0 26%, #9c9891 27% 100%);
-  background-image: repeating-conic-gradient(from 0deg, transparent 0 40deg, #2b2b2b 40deg 60deg), radial-gradient(circle, #e9e7e2 0 26%, #9c9891 27% 100%);
+  border-radius: 50%; background: radial-gradient(circle, #f2f0ec 0 16%, #b9b5ad 18% 58%, #2b2b2b 60% 66%, transparent 68%);
   animation: cs-spin 1.1s linear infinite;
 }
 .cs-hub.right { left: 78%; }
@@ -249,13 +257,13 @@
 /* ---------- iPod classic (7.3) ---------- */
 .ipod {
   position: relative; width: 100%; aspect-ratio: 300 / 500; border-radius: 34px; padding: 8% 9% 7%;
-  display: grid; grid-template-rows: auto 1fr; gap: 8%;
+  display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 8%;
   background: linear-gradient(160deg, #f3f2ef, #cfccc6 55%, #e6e4df);
   box-shadow: var(--shadow-2), inset 0 1px 0 #fff, inset 0 -2px 0 rgba(0, 0, 0, 0.12);
   color: #1b1b1b;
 }
 .ipod-screen {
-  position: relative; border-radius: 6px; background: #fff; overflow: hidden;
+  position: relative; width: 100%; min-width: 0; border-radius: 6px; background: #fff; overflow: hidden;
   border: 3px solid #0b0b0b; display: grid; grid-template-rows: auto 1fr; min-height: 0;
 }
 .ipod-bar {

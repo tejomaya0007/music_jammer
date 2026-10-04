@@ -345,16 +345,46 @@ export async function moveSong(songId: string, toIndex: number) {
 
 // ----- playback -----
 
+/**
+ * Show a playback change at once, before the server answers, then let the server's state
+ * (realtime or the refresh below) confirm or correct it. The room sees the server's answer anyway.
+ */
+function showLocally(change: { is_playing?: boolean; anchor_pos_ms: number }) {
+  const { room } = get();
+  if (!room) return;
+  patch({
+    room: {
+      ...room,
+      ...change,
+      anchor_time: new Date(serverNowMs()).toISOString(),
+    },
+  });
+}
+
+/** Send a playback change; if the server refuses it, toast the reason and show the server's real state. */
+async function sendPlayback(call: () => Promise<void>) {
+  try {
+    await call();
+  } catch (e) {
+    toast((e as Error).message, 'error');
+    void refresh();
+  }
+}
+
 export async function playPause() {
   const { roomId, room } = get();
   if (!roomId || !room) return;
-  await run(() => api.playback(roomId, room.is_playing ? 'pause' : 'play', currentPosMs()));
+  const pos = currentPosMs();
+  const nextPlaying = !room.is_playing;
+  showLocally({ is_playing: nextPlaying, anchor_pos_ms: pos });
+  await sendPlayback(() => api.playback(roomId, nextPlaying ? 'play' : 'pause', pos));
 }
 
 export async function seekTo(sec: number) {
   const { roomId } = get();
   if (!roomId) return;
-  await run(() => api.playback(roomId, 'seek', sec * 1000));
+  showLocally({ anchor_pos_ms: Math.max(0, Math.round(sec * 1000)) });
+  await sendPlayback(() => api.playback(roomId, 'seek', sec * 1000));
 }
 
 export async function playSong(songId: string) {

@@ -796,3 +796,17 @@ describe('avatars', () => {
     expect(await avatarOf(room.id, guest)).toBe('radio:sky');
   });
 });
+
+describe('a removed member cannot rejoin by leaving first', () => {
+  it('kicked user calls leave_room, then join_room is still refused', async () => {
+    const host = await newUser(db);
+    const room = await createRoom(db, host, 'Host');
+    const guest = await newUser(db);
+    await joinRoom(db, guest, room.code, 'Guest');
+    await asUser(db, host, 'select public.kick_member($1, $2)', [room.id, guest]);
+    await asUser(db, guest, 'select public.leave_room($1)', [room.id]);
+    const r = await tryAs(db, guest, 'select public.join_room($1, $2)', [room.code, 'Guest']);
+    expect(r).toEqual({ ok: false, error: 'You were removed from this room' });
+    expect((await members(room.id)).find((m) => m.user_id === guest)?.is_kicked).toBe(true);
+  });
+});

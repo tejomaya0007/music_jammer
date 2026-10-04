@@ -86,7 +86,8 @@ export function Stage({ showVideo, onToggleVideo }: { showVideo: boolean; onTogg
 
       <SeekBar positionSec={positionMs / 1000} durationSec={durationSec} disabled={!song} />
 
-      {skin === 'ipod' && <VolumeControl value={volume} />}
+      {/* one volume for every device: the same control under all three */}
+      <VolumeControl value={volume} />
     </section>
   );
 }
