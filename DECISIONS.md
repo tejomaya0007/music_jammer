@@ -111,3 +111,14 @@ Every judgment call made while building Jam Room, in the order they came up. Eac
 75. **Design built from DESIGN.md**: walnut and paper tokens exactly as specified; Fraunces, DM Sans, Special Elite and IBM Plex Mono self-hosted through npm (no Google Fonts request); onboarding with 12 icons and 8 ring colours; home with two large cards; ticket with the code and link; six-box code entry; room with a stage and a rail (desktop) or tabs (phone); three skins (turntable with a rAF spin and tonearm, cassette with reels, iPod with a working click wheel); always-mounted video dock.
 76. **Judgment calls in the design build**: the turntable fader and the cassette fader are the volume control for those skins (iPod gets the shared row); the tonearm rests at 90 degrees and lowers onto the outer groove at 153.8 degrees plus progress; the paper-500 text colour is #948874 (not #8f826c) to clear 4.5:1 on the walnut surfaces; "Install the app" is not shown (no install prompt wiring yet); the QR code is not included.
 77. **Not built yet from DESIGN.md**: the power-on moment (7.5), the QR code (6.3), the install link (6.2), and the axe and screenshot assertions (section 16). The spacing and visual polish are the next pass, as requested.
+
+## Open requirement: keep playing in the background
+
+Asked: when a friend switches apps, presses home, or locks the phone, the room keeps playing.
+
+What the web can and cannot do:
+- **Can:** Media Session lock-screen controls (already in place); keep the room state and heartbeat alive with a Web Worker timer (not throttled like page timers); on return, re-sync the player to the room.
+- **Cannot guarantee:** Android Chrome and Brave pause a hidden YouTube iframe unless Brave's background-play setting is on. iOS Safari stops hidden web audio. A web app cannot override this.
+- **Real fix:** a native wrapper (Capacitor or similar) with a background audio service. That is a separate build.
+
+Status: not built yet. Next step is the Worker timers and re-sync on return (best effort); the native wrapper is a decision for later.
