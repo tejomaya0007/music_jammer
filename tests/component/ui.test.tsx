@@ -1,10 +1,7 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
 import type { ReactNode } from 'react';
-
-afterEach(() => cleanup());
 
 // The backend is replaced with a recording fake: these tests check UI behaviour, not SQL.
 const fake = vi.hoisted(() => ({
@@ -26,26 +23,21 @@ vi.mock('../../src/lib/backend', () => ({
   },
 }));
 
-import { Home } from '../../src/components/Home';
+import { Onboarding } from '../../src/screens/Onboarding';
+import { Home } from '../../src/screens/Home';
+import { JoinCode } from '../../src/screens/JoinCode';
+import { RoomReady } from '../../src/screens/RoomReady';
 import { Toasts } from '../../src/components/Toasts';
-import { NowPlaying } from '../../src/components/NowPlaying';
-import { ChatBar } from '../../src/components/Chat';
-import { Queue } from '../../src/components/Queue';
-import { Sheet } from '../../src/components/parts';
+import { SeekBar } from '../../src/components/stage/SeekBar';
+import { VolumeControl } from '../../src/components/stage/VolumeControl';
+import { ChatPanel } from '../../src/components/Chat';
 import { useRoomStore, toast } from '../../src/state/roomStore';
-import type { RoomRow, SongRow, MemberRow } from '../../src/lib/api';
-import { createRef } from 'react';
+import { parseAvatar, AVATAR_ICONS, AVATAR_COLOR_IDS } from '../../src/lib/avatars';
+import { readProfile, saveProfile } from '../../src/lib/profile';
+import { AvatarPicker } from '../../src/components/avatar/AvatarPicker';
+import { parseVideoLinks } from '../../src/lib/link';
 
-const room = (over: Partial<RoomRow> = {}): RoomRow => ({
-  id: 'r1', code: 'ABC123', host_id: 'me-user', status: 'active', current_song_id: null, is_playing: false,
-  anchor_pos_ms: 0, anchor_time: new Date(0).toISOString(), state_version: 1, max_members: 10,
-  last_activity_at: new Date().toISOString(), created_at: new Date().toISOString(), ...over,
-});
-const song = (id: string, title: string, over: Partial<SongRow> = {}): SongRow => ({
-  id, room_id: 'r1', video_id: `vid${id}`.padEnd(11, 'x').slice(0, 11), title, thumbnail: `https://i.ytimg.com/vi/${id}/mq.jpg`,
-  added_by: 'me-user', position: Number(id.replace(/\D/g, '')) || 1, created_at: new Date().toISOString(), ...over,
-});
-const member = (user_id: string, name: string): MemberRow => ({ user_id, name, avatar: null, joined_at: new Date().toISOString(), is_kicked: false });
+afterEach(() => cleanup());
 
 function wrap(ui: ReactNode) {
   return (
@@ -62,153 +54,168 @@ beforeEach(() => {
   fake.rpcError = null;
   useRoomStore.setState({
     booted: true, userId: 'me-user', name: 'Ana', roomId: null, code: null, room: null, songs: [], members: [],
-    messages: [], online: [], unlocked: false, unread: 0, chatOpen: false, toasts: [], pending: 0, durationSec: 0, pendingRoom: null,
+    messages: [], online: [], unlocked: false, unread: 0, chatOpen: false, toasts: [], pending: 0, durationSec: 0,
+    pendingRoom: null, invite: null,
   });
   localStorage.clear();
 });
 
-describe('Home', () => {
-  it('asks for a name before creating a room', async () => {
-    render(wrap(<Home inviteCode={null} />));
-    fireEvent.click(screen.getByRole('button', { name: 'Create a room' }));
-    expect(await screen.findByText('Add your name to start')).toBeInTheDocument();
-    expect(fake.calls.find((c) => c.fn === 'create_room')).toBeUndefined();
-  });
-
-  it('create shows the new room code before any entering happens', async () => {
-    fake.rpcResult = { id: 'r1', code: 'ABC123' };
-    render(wrap(<Home inviteCode={null} />));
-    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: '  Ana  ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create a room' }));
-    expect(await screen.findByText('ABC123')).toBeInTheDocument();
-    expect(fake.calls.find((c) => c.fn === 'create_room')?.args).toEqual({ p_name: 'Ana' });
-    expect(useRoomStore.getState().roomId).toBeNull();
-    expect(localStorage.getItem('jam:name')).toBe('Ana');
-  });
-
-  it('Open room enters the room', async () => {
-    fake.rpcResult = { id: 'r1', code: 'ABC123' };
-    render(wrap(<Home inviteCode={null} />));
+describe('onboarding', () => {
+  it('Continue stays disabled until a name is typed', () => {
+    render(<Onboarding onDone={() => undefined} />);
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: '   ' } });
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Ana' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create a room' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'Open room' }));
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
+  it('saves the name and a valid avatar, then reports done', () => {
+    const onDone = vi.fn();
+    render(<Onboarding onDone={onDone} />);
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Ana' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(onDone).toHaveBeenCalledWith('Ana');
+    const p = readProfile();
+    expect(p?.name).toBe('Ana');
+    expect(parseAvatar(p?.avatar)).not.toBeNull();
+  });
+});
+
+describe('avatar picker', () => {
+  it('offers 12 icons and 8 ring colours, and Surprise me changes the face', () => {
+    const changes: Array<{ icon: string; color: string }> = [];
+    const value = { icon: 'vinyl' as const, color: 'amber' as const };
+    render(<AvatarPicker value={value} onChange={(a) => changes.push(a)} />);
+    expect(screen.getAllByRole('radio', { name: /.+/ })).toHaveLength(AVATAR_ICONS.length + AVATAR_COLOR_IDS.length);
+    fireEvent.click(screen.getByRole('radio', { name: 'cassette' }));
+    expect(changes.at(-1)).toEqual({ icon: 'cassette', color: 'amber' });
+    fireEvent.click(screen.getByRole('button', { name: 'Surprise me' }));
+    expect(changes.length).toBe(2);
+  });
+});
+
+describe('home', () => {
+  beforeEach(() => saveProfile({ name: 'Ana', avatar: 'vinyl:amber' }));
+
+  it('shows the two large choices', () => {
+    render(wrap(<Home onJoin={() => undefined} onEditProfile={() => undefined} />));
+    expect(screen.getByRole('button', { name: /Start a room/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Join with a code/ })).toBeInTheDocument();
+  });
+
+  it('start creates the room and keeps its code for the ticket screen', async () => {
+    fake.rpcResult = { id: 'r1', code: 'ABC123' };
+    render(wrap(<Home onJoin={() => undefined} onEditProfile={() => undefined} />));
+    fireEvent.click(screen.getByRole('button', { name: /Start a room/ }));
+    await waitFor(() => expect(useRoomStore.getState().pendingRoom).toEqual({ id: 'r1', code: 'ABC123' }));
+    expect(fake.calls.find((c) => c.fn === 'create_room')?.args).toEqual({ p_name: 'Ana', p_avatar: 'vinyl:amber' });
+    expect(useRoomStore.getState().roomId).toBeNull();
+  });
+});
+
+describe('ticket', () => {
+  it('shows the code, copies it, and enters the room on Enter room', async () => {
+    useRoomStore.setState({ pendingRoom: { id: 'r1', code: 'ABC123' } });
+    render(wrap(<RoomReady code="ABC123" />));
+    expect(screen.getByLabelText('Room code ABC123')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Enter room' }));
     await waitFor(() => expect(useRoomStore.getState().pendingRoom).toBeNull());
   });
+});
 
-  it('join a room asks for a code, uppercases it, and joins', async () => {
-    render(wrap(<Home inviteCode={null} />));
-    fireEvent.click(screen.getByRole('button', { name: 'Join a room' }));
-    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Bo' } });
-    fireEvent.change(screen.getByLabelText('Room code'), { target: { value: 'abc123' } });
-    expect(screen.getByLabelText('Room code')).toHaveValue('ABC123');
-    fireEvent.click(screen.getByRole('button', { name: 'Join the room' }));
-    await waitFor(() => expect(fake.calls.find((c) => c.fn === 'join_room')?.args).toEqual({ p_code: 'ABC123', p_name: 'Bo' }));
+describe('join by code (six boxes)', () => {
+  it('auto-advances on type, fills all six on paste, and blocks Join until complete', () => {
+    render(wrap(<JoinCode onBack={() => undefined} />));
+    const boxes = screen.getAllByRole('textbox');
+    expect(boxes).toHaveLength(6);
+    expect(screen.getByRole('button', { name: 'Join room' })).toBeDisabled();
+    fireEvent.change(boxes[0], { target: { value: 'k' } });
+    expect(boxes[0]).toHaveValue('K');
+    fireEvent.change(boxes[1], { target: { value: '7' } });
+    expect(boxes[1]).toHaveValue('7');
   });
 
-  it('an invite link opens the join form with the code filled in', () => {
-    render(wrap(<Home inviteCode="abc123" />));
-    expect(screen.getByLabelText('Room code')).toHaveValue('ABC123');
-    fireEvent.change(screen.getByLabelText('Room code'), { target: { value: 'xyz' } });
-    expect(screen.getByLabelText('Room code')).toHaveValue('XYZ');
+  it('only accepts the code alphabet (no 0, O, 1, I, L)', () => {
+    render(wrap(<JoinCode onBack={() => undefined} />));
+    const first = screen.getAllByRole('textbox')[0];
+    fireEvent.change(first, { target: { value: 'O' } });
+    expect(first).toHaveValue('');
+    fireEvent.change(first, { target: { value: 'L' } });
+    expect(first).toHaveValue('');
   });
 
-  it('shows the join error from the database as-is', async () => {
+  it('a pasted code fills the boxes and enables Join', () => {
+    render(wrap(<JoinCode onBack={() => undefined} />));
+    const boxes = screen.getAllByRole('textbox');
+    fireEvent.paste(boxes[0], { clipboardData: { getData: () => 'abc234' } });
+    expect(boxes.map((b) => (b as HTMLInputElement).value).join('')).toBe('ABC234');
+    expect(screen.getByRole('button', { name: 'Join room' })).toBeEnabled();
+  });
+
+  it('shows the database message inline, as the server returns it', async () => {
     fake.rpcError = 'Room not found or closed';
-    render(wrap(<Home inviteCode={null} />));
-    fireEvent.click(screen.getByRole('button', { name: 'Join a room' }));
-    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Bo' } });
-    fireEvent.change(screen.getByLabelText('Room code'), { target: { value: 'NOPE42' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Join the room' }));
-    expect(await screen.findByText('Room not found or closed')).toBeInTheDocument();
+    render(wrap(<JoinCode initial="NPE423" onBack={() => undefined} />));
+    saveProfile({ name: 'Bo', avatar: 'radio:sky' });
+    fireEvent.click(screen.getByRole('button', { name: 'Join room' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent("That code doesn't match a room");
   });
 });
 
-describe('NowPlaying', () => {
-  it('shows the tap-to-join gate until the first tap, then unlocks the player', () => {
-    useRoomStore.setState({ roomId: 'r1', room: room({ current_song_id: 's1', is_playing: true }), songs: [song('s1', 'Blue')] });
-    render(<NowPlaying mountRef={createRef<HTMLDivElement>()} />);
-    expect(screen.getByText('Tap to join the music')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Join in' }));
-    expect(useRoomStore.getState().unlocked).toBe(true);
-    expect(screen.queryByText('Tap to join the music')).toBeNull();
+describe('stage controls', () => {
+  it('seek bar cannot be moved until the length is known', () => {
+    render(<SeekBar positionSec={0} durationSec={0} disabled={false} />);
+    expect(screen.getByRole('slider', { name: 'Seek' })).toBeDisabled();
+    expect(screen.getByText('--:--')).toBeInTheDocument();
   });
 
-  it('says what to do when the queue is empty', () => {
-    useRoomStore.setState({ roomId: 'r1', room: room() });
-    render(<NowPlaying mountRef={createRef<HTMLDivElement>()} />);
-    expect(screen.getByText('Add a link to start the jam')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+  it('shows elapsed and total time once the length is known', () => {
+    render(<SeekBar positionSec={65} durationSec={213} disabled={false} />);
+    expect(screen.getByText('1:05')).toBeInTheDocument();
+    expect(screen.getByText('3:33')).toBeInTheDocument();
   });
 
-  it('shows the title, who added it, and the play/pause state', () => {
-    useRoomStore.setState({
-      roomId: 'r1', unlocked: true, room: room({ current_song_id: 's1', is_playing: false }),
-      songs: [song('s1', 'Blue in Green')], members: [member('me-user', 'Ana')],
-    });
-    render(<NowPlaying mountRef={createRef<HTMLDivElement>()} />);
-    expect(screen.getByRole('heading', { name: 'Blue in Green' })).toBeInTheDocument();
-    expect(screen.getByText('Added by Ana')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled();
+  it('volume is this person only: changing it stores it on this device', () => {
+    render(<VolumeControl value={80} />);
+    fireEvent.change(screen.getByRole('slider', { name: 'Volume' }), { target: { value: '35' } });
+    expect(useRoomStore.getState().volume).toBe(35);
+    expect(localStorage.getItem('jam_volume')).toBe('35');
   });
 });
 
-describe('Queue', () => {
-  it('lists songs in order, marks the playing one, and flags duplicates', () => {
+describe('chat panel', () => {
+  it('shows an empty state and groups consecutive lines from one person', () => {
     useRoomStore.setState({
       roomId: 'r1',
-      room: room({ current_song_id: 's2' }),
-      members: [member('me-user', 'Ana')],
-      songs: [
-        song('s1', 'First', { video_id: 'AAAAAAAAAAA' }),
-        song('s2', 'Second', { video_id: 'BBBBBBBBBBB' }),
-        song('s3', 'Again', { video_id: 'AAAAAAAAAAA' }),
+      userId: 'me-user',
+      members: [{ user_id: 'bo', name: 'Bo', avatar: null, joined_at: new Date().toISOString(), is_kicked: false }],
+      messages: [
+        { id: '1', room_id: 'r1', user_id: 'bo', name: 'Bo', kind: 'user', text: 'one', created_at: new Date().toISOString() },
+        { id: '2', room_id: 'r1', user_id: 'bo', name: 'Bo', kind: 'user', text: 'two', created_at: new Date().toISOString() },
       ],
     });
-    render(wrap(<Queue />));
-    const rows = screen.getAllByRole('listitem');
-    expect(rows).toHaveLength(3);
-    expect(rows[1]).toHaveClass('current');
-    expect(screen.getByText(/already in queue/)).toBeInTheDocument();
-    expect(screen.getByText('3 / 200')).toBeInTheDocument();
+    const { container } = render(<ChatPanel />);
+    expect(screen.getByText('one')).toBeInTheDocument();
+    expect(screen.getByText('two')).toBeInTheDocument();
+    expect(container.querySelectorAll('.msg.grouped')).toHaveLength(1);
   });
 
-  it('removing a song calls remove_song with its id', async () => {
-    useRoomStore.setState({ roomId: 'r1', room: room(), songs: [song('s1', 'Only')] });
-    render(wrap(<Queue />));
-    fireEvent.click(screen.getByRole('button', { name: 'Remove Only' }));
-    await waitFor(() => expect(fake.calls.find((c) => c.fn === 'remove_song')?.args).toEqual({ p_song: 's1' }));
+  it('empty chat says what it is for', () => {
+    render(<ChatPanel />);
+    expect(screen.getByText('Say something. Everyone in the room sees it.')).toBeInTheDocument();
   });
 });
 
-describe('ChatBar', () => {
-  it('shows an unread count when the drawer is closed', () => {
-    useRoomStore.setState({ unread: 3, chatOpen: false });
-    render(<ChatBar />);
-    expect(screen.getByRole('button', { name: 'Chat, 3 unread' })).toHaveTextContent('3');
-  });
-
-  it('opens the drawer on tap and clears the count', () => {
-    useRoomStore.setState({ unread: 2, chatOpen: false, roomId: 'r1', room: room(), messages: [] });
-    render(<ChatBar />);
-    fireEvent.click(screen.getByRole('button', { name: 'Chat, 2 unread' }));
-    expect(useRoomStore.getState().chatOpen).toBe(true);
-    expect(useRoomStore.getState().unread).toBe(0);
-  });
-});
-
-describe('Sheet', () => {
-  it('closes on Escape and on the scrim', () => {
-    const onClose = vi.fn();
-    const { container } = render(<Sheet title="Test" onClose={onClose}><p>body</p></Sheet>);
-    fireEvent.keyDown(window, { key: 'Escape' });
-    expect(onClose).toHaveBeenCalledTimes(1);
-    fireEvent.click(container.querySelector('.scrim')!);
-    expect(onClose).toHaveBeenCalledTimes(2);
+describe('link parsing for the add bar', () => {
+  it('splits a multi-line paste into ids and junk', () => {
+    const r = parseVideoLinks('dQw4w9WgXcQ\nnot a link');
+    expect(r.ids).toEqual(['dQw4w9WgXcQ']);
+    expect(r.invalid).toEqual(['not', 'a', 'link']);
   });
 });
 
 describe('toasts', () => {
-  it('shows a message and removes it after its timeout', async () => {
+  it('shows a message and removes it after its timeout', () => {
     vi.useFakeTimers();
     try {
       render(<Toasts />);

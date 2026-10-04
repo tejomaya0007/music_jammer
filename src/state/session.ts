@@ -425,3 +425,20 @@ export function resetSessionForTests() {
   leaveLocal();
   useRoomStore.setState({ roomId: null, room: null, songs: [], members: [], messages: [], booted: false, userId: null });
 }
+
+const JOIN_MESSAGES: Record<string, string> = {
+  'Room not found or closed': "That code doesn't match a room. Check the six characters and try again.",
+};
+
+/** Join from the code screen: returns the message to show inline instead of a toast (null = joined). */
+export async function tryJoin(code: string, name: string): Promise<string | null> {
+  const clean = code.trim().toUpperCase();
+  try {
+    const r = await api.joinRoom(clean, name.trim(), getStoredAvatar());
+    await enter(r.id, r.code);
+    return null;
+  } catch (e) {
+    const msg = (e as Error).message;
+    return JOIN_MESSAGES[msg] ?? msg;
+  }
+}

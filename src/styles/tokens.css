@@ -1,0 +1,72 @@
+/* ------------------------------------------------------------------
+   Jam Room design tokens (DESIGN.md section 3). Nothing hard-coded
+   in components: colours, sizes, radii, durations come from here.
+------------------------------------------------------------------ */
+:root {
+  color-scheme: dark;
+
+  /* 3.1 colour: walnut chrome, paper text, lamp amber, chrome devices */
+  --walnut-950: #17100c;
+  --walnut-900: #201610;
+  --walnut-800: #2c1e15;
+  --walnut-700: #3d2a1d;
+  --walnut-500: #6f523c;
+  --paper-100: #f2e8d5;
+  --paper-300: #c9bba1;
+  --paper-500: #948874;
+  --chrome-100: #e9e7e2;
+  --chrome-300: #bdb9b0;
+  --chrome-600: #6d6a63;
+  --shell-800: #35332f;
+  --lamp-400: #ffb547;
+  --lamp-600: #d98a14;
+  --lamp-glow: rgba(255, 181, 71, 0.35);
+  --vu-400: #7ed39a;
+  --rec-500: #d6453d;
+  --tape-teal: #2f8f7c;
+  --tape-brown: #2b1b12;
+
+  /* 3.2 type */
+  --font-display: "Fraunces Variable", "Iowan Old Style", Georgia, serif;
+  --font-ui: "DM Sans Variable", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-typewriter: "Special Elite", "Courier New", monospace;
+  --font-readout: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  --fs-display: clamp(2rem, 1.2rem + 3vw, 3.5rem);
+  --fs-title: clamp(1.25rem, 1rem + 1vw, 1.75rem);
+  --fs-h2: 1.25rem;
+  --fs-body: 0.9375rem;
+  --fs-small: 0.8125rem;
+  --fs-micro: 0.75rem;
+
+  /* 3.3 spacing (4 px base), radius by role, warm elevation */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+  --r-chip: 8px;
+  --r-input: 12px;
+  --r-card: 18px;
+  --r-sheet: 28px;
+  --r-pill: 999px;
+  --shadow-1: 0 1px 0 rgba(255, 225, 170, 0.06) inset, 0 6px 16px rgba(10, 5, 2, 0.45);
+  --shadow-2: 0 1px 0 rgba(255, 225, 170, 0.08) inset, 0 18px 40px rgba(10, 5, 2, 0.6);
+  --touch-min: 44px;
+
+  /* 3.4 motion */
+  --t-fast: 120ms;
+  --t-base: 220ms;
+  --t-slow: 420ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-mech: cubic-bezier(0.3, 0.7, 0.4, 1);
+
+  /* layout */
+  --gutter: 16px;
+  --rail-w: 380px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}

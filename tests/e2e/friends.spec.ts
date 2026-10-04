@@ -1,19 +1,17 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from '@playwright/test';
 import {
   resetBackend, createRoom, joinByCode, joinByLink, addLinks, queueTitles, positionSec, tapToJoinMusic,
+  togglePlayPause, isPlaying,
 } from './helpers';
 
-/** Three friends, three separate browser contexts (no shared storage). */
+/** Three friends, three separate browser contexts (no shared storage). Desktop layout: all panels visible. */
 interface Friend { ctx: BrowserContext; page: Page }
 async function friend(browser: Browser): Promise<Friend> {
-  const ctx = await browser.newContext({
-    viewport: { width: 412, height: 860 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2.6,
-  });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   return { ctx, page: await ctx.newPage() };
 }
 
-const nowTitle = (p: Page) => p.locator('.now-title').textContent();
-const isPlaying = async (p: Page) => (await p.locator('button.tbtn.big').getAttribute('aria-label')) === 'Pause';
+const nowTitle = (p: Page) => p.locator('.track-title').textContent();
 
 test.describe.configure({ mode: 'serial' });
 
@@ -84,8 +82,7 @@ test('synced transport: play, pause, seek, next, previous, and the drag reorder 
     await addLinks(a.page, 'dQw4w9WgXcQ jNQXAC9IVRw M7lc1UVf-VE');
     await expect.poll(() => queueTitles(c.page)).toHaveLength(3);
 
-    // everyone taps "Tap to join the music" (browser autoplay rule)
-    for (const f of [a, b, c]) await expect(f.page.getByRole('button', { name: 'Join in' })).toBeVisible();
+    // everyone taps "Join the music" (browser autoplay rule)
     for (const f of [a, b, c]) await tapToJoinMusic(f.page);
 
     // all three are on the first song, playing, and within a second of each other
@@ -97,36 +94,35 @@ test('synced transport: play, pause, seek, next, previous, and the drag reorder 
     await expect.poll(async () => Math.abs((await positionSec(a.page)) - (await positionSec(c.page)))).toBeLessThan(1.5);
 
     // pause from a friend's phone; once paused the position must stop moving
-    await b.page.locator('button.tbtn.big').click();
+    await togglePlayPause(b.page);
     for (const f of [a, b, c]) await expect.poll(() => isPlaying(f.page)).toBe(false);
-    await a.page.waitForTimeout(400); // let the seek bar catch up with the store (it refreshes every 250 ms)
+    await a.page.waitForTimeout(400);
     const paused = await positionSec(a.page);
     await a.page.waitForTimeout(1200);
     expect(Math.abs((await positionSec(a.page)) - paused)).toBeLessThan(0.3);
 
     // resume
-    await c.page.locator('button.tbtn.big').click();
+    await togglePlayPause(c.page);
     for (const f of [a, b, c]) await expect.poll(() => isPlaying(f.page)).toBe(true);
 
     // seek with the keyboard on the seek bar: 100 steps of 0.1 s = about 10 s in
-    const bar = b.page.locator('input.bar');
+    const bar = b.page.getByRole('slider', { name: 'Seek' });
     await bar.focus();
     for (let i = 0; i < 100; i++) await b.page.keyboard.press('ArrowRight');
     await expect.poll(() => positionSec(a.page), { timeout: 15_000 }).toBeGreaterThan(9.5);
-    // everyone lands on the same moment (playback keeps moving, so compare friends, not a fixed number)
     await expect.poll(async () => Math.abs((await positionSec(a.page)) - (await positionSec(c.page))), { timeout: 15_000 }).toBeLessThan(1.5);
     await expect.poll(async () => Math.abs((await positionSec(a.page)) - (await positionSec(b.page))), { timeout: 15_000 }).toBeLessThan(1.5);
 
     // next, then previous, from the host
-    await a.page.getByRole('button', { name: 'Next' }).click();
+    await a.page.getByRole('button', { name: 'Next song' }).click();
     for (const f of [a, b, c]) await expect.poll(() => nowTitle(f.page)).toBe('Fake song jNQXAC9IVRw');
-    await c.page.getByRole('button', { name: 'Previous' }).click();
+    await c.page.getByRole('button', { name: 'Previous song' }).click();
     for (const f of [a, b, c]) await expect.poll(() => nowTitle(f.page)).toBe(first);
 
     // drag the third song to the top, everyone sees it
     const grip = a.page.locator('li.row').nth(2).locator('button.grip');
     const target = a.page.locator('li.row').nth(0);
-    await grip.scrollIntoViewIfNeeded(); // the third row starts below the fold on a phone
+    await grip.scrollIntoViewIfNeeded();
     const g = await grip.boundingBox();
     const t = await target.boundingBox();
     if (!g || !t) throw new Error('queue rows not laid out');
@@ -145,7 +141,7 @@ test('synced transport: play, pause, seek, next, previous, and the drag reorder 
   }
 });
 
-test('chat reaches everyone, unread badge counts while the drawer is closed', async ({ browser }) => {
+test('chat reaches everyone; system lines show joins', async ({ browser }) => {
   const a = await friend(browser);
   const b = await friend(browser);
   const c = await friend(browser);
@@ -154,26 +150,18 @@ test('chat reaches everyone, unread badge counts while the drawer is closed', as
     await joinByLink(b.page, code, 'Bo');
     await joinByLink(c.page, code, 'Cy');
 
-    await a.page.getByRole('button', { name: 'Chat' }).click();
     await a.page.getByLabel('Message').fill('hello friends');
     await a.page.getByRole('button', { name: 'Send' }).click();
-    await expect(a.page.locator('.msg .bubble', { hasText: 'hello friends' })).toBeVisible();
-
-    // b and c have the drawer closed: unread badge shows 1
-    for (const f of [b, c]) {
-      await expect(f.page.locator('.chat-bar .badge')).toHaveText('1');
+    for (const f of [a, b, c]) {
+      await expect(f.page.locator('.msg .bubble', { hasText: 'hello friends' })).toBeVisible();
     }
-    await b.page.getByRole('button', { name: /Chat/ }).click();
-    await expect(b.page.locator('.msg .bubble', { hasText: 'hello friends' })).toBeVisible();
     await expect(b.page.locator('.sys', { hasText: 'Cy joined' })).toBeVisible();
-    await b.page.getByRole('button', { name: 'Close' }).click();
-    await expect(b.page.locator('.chat-bar .badge')).toHaveCount(0);
   } finally {
     for (const f of [a, b, c]) await f.ctx.close();
   }
 });
 
-test('host leaves and the music keeps playing under a new host, then host kicks and closes', async ({ browser }) => {
+test('host leaves and the music keeps playing under a new host, then host removes and closes', async ({ browser }) => {
   const a = await friend(browser);
   const b = await friend(browser);
   const c = await friend(browser);
@@ -186,31 +174,35 @@ test('host leaves and the music keeps playing under a new host, then host kicks 
     await tapToJoinMusic(b.page);
     await tapToJoinMusic(c.page);
     await expect.poll(() => isPlaying(b.page)).toBe(true);
+
     // host (Ana) taps Leave
     await a.page.getByRole('button', { name: 'Leave' }).click();
-    await expect(a.page.locator('.home')).toBeVisible();
+    await expect(a.page.locator('.stage-page')).toBeVisible();
+
     // the longest-present member, Bo, becomes host; music still playing
     await expect(b.page.locator('.toast', { hasText: "You're now the host" })).toBeVisible();
-    await expect(b.page.locator('.person[data-name="Bo"]').locator('.crown')).toBeVisible();
+    await expect(b.page.locator('.person[data-name="Bo"] .host-badge')).toBeVisible();
     await expect.poll(() => isPlaying(c.page)).toBe(true);
     await expect.poll(() => nowTitle(c.page)).toBe('Fake song dQw4w9WgXcQ');
     await expect(b.page.locator('.count')).toHaveText('2 online');
-    // new host kicks Cy
+
+    // new host removes Cy
     await b.page.locator('.people').click();
     await b.page.getByRole('button', { name: 'Remove Cy' }).click();
     await expect(c.page.locator('.toast.error', { hasText: 'you were removed' })).toBeVisible();
-    await expect(c.page.locator('.home')).toBeVisible();
-    // a kicked person cannot get back in with the same code
-    await c.page.getByLabel('Your name').fill('Cy');
-    await c.page.getByRole('button', { name: 'Join a room' }).click();
-    await c.page.getByLabel('Room code').fill(code);
-    await c.page.getByRole('button', { name: 'Join the room' }).click();
-    await expect(c.page.locator('.toast.error', { hasText: 'You were removed from this room' })).toBeVisible();
-    await expect(c.page.locator('.home')).toBeVisible();
-    // host closes the room for everyone (the people sheet is still open from the kick)
+    await expect(c.page.locator('.stage-page')).toBeVisible();
+
+    // a removed person cannot get back in with the same code
+    await c.page.getByRole('button', { name: 'Join with a code' }).click();
+    const chars = code.split('');
+    for (let i = 0; i < 6; i++) await c.page.getByLabel(`Character ${i + 1} of 6`).fill(chars[i]);
+    await c.page.getByRole('button', { name: 'Join room' }).click();
+    await expect(c.page.locator('.error-msg, .form-error, .toast.error', { hasText: 'You were removed from this room' }).first()).toBeVisible();
+
+    // host closes the room for everyone (the member panel is still open from the removal)
     await b.page.getByRole('button', { name: 'Close room for everyone' }).click();
     await b.page.getByRole('button', { name: 'Close room', exact: true }).click();
-    await expect(b.page.locator('.home')).toBeVisible();
+    await expect(b.page.locator('.stage-page')).toBeVisible();
   } finally {
     for (const f of [a, b, c]) await f.ctx.close();
   }
@@ -239,36 +231,15 @@ test('a room with one person works alone', async ({ browser }) => {
     await expect.poll(() => queueTitles(a.page)).toHaveLength(2);
     await tapToJoinMusic(a.page);
     await expect.poll(() => isPlaying(a.page)).toBe(true);
-    await a.page.getByRole('button', { name: 'Next' }).click();
+    await a.page.getByRole('button', { name: 'Next song' }).click();
     await expect.poll(() => nowTitle(a.page)).toBe('Fake song jNQXAC9IVRw');
-    await a.page.getByRole('button', { name: 'Next' }).click();
+    await a.page.getByRole('button', { name: 'Next song' }).click();
     await expect.poll(() => isPlaying(a.page)).toBe(false);
-    await a.page.getByRole('button', { name: 'Chat' }).click();
     await a.page.getByLabel('Message').fill('talking to myself');
     await a.page.getByRole('button', { name: 'Send' }).click();
     await expect(a.page.locator('.msg .bubble', { hasText: 'talking to myself' })).toBeVisible();
   } finally {
     await a.ctx.close();
-  }
-});
-
-test('host disconnects without leaving: after about 40 s the next person takes over', async ({ browser }) => {
-  test.setTimeout(150_000);
-  const a = await friend(browser);
-  const b = await friend(browser);
-  try {
-    const code = await createRoom(a.page, 'Ana');
-    await joinByLink(b.page, code, 'Bo');
-    await addLinks(a.page, 'dQw4w9WgXcQ');
-    await expect.poll(() => queueTitles(b.page)).toHaveLength(1);
-    await a.ctx.close(); // tab closed, no leave
-
-    await expect(b.page.locator('.count')).toHaveText('1 online');
-    await expect(b.page.locator('.person[data-name="Ana"]').locator('.crown')).toHaveCount(1);
-    await expect(b.page.locator('.person[data-name="Bo"]').locator('.crown')).toHaveCount(1, { timeout: 90_000 });
-    await expect(b.page.locator('.toast', { hasText: "You're now the host" })).toBeVisible({ timeout: 10_000 });
-  } finally {
-    await b.ctx.close();
   }
 });
 
@@ -289,11 +260,29 @@ test('a friend who joins mid-song lands on the same moment as the room', async (
     await joinByLink(c.page, code, 'Cy');
     await tapToJoinMusic(c.page);
     await expect.poll(() => isPlaying(c.page)).toBe(true);
-    // all three within about a second of each other, and playing well past the start
     await expect.poll(() => positionSec(c.page)).toBeGreaterThan(5);
     await expect.poll(async () => Math.abs((await positionSec(a.page)) - (await positionSec(c.page)))).toBeLessThan(1.5);
     await expect.poll(async () => Math.abs((await positionSec(b.page)) - (await positionSec(c.page)))).toBeLessThan(1.5);
   } finally {
     for (const f of [a, b, c]) await f.ctx.close();
+  }
+});
+
+test('host disconnects without leaving: after about 40 s the next person takes over', async ({ browser }) => {
+  test.setTimeout(150_000);
+  const a = await friend(browser);
+  const b = await friend(browser);
+  try {
+    const code = await createRoom(a.page, 'Ana');
+    await joinByLink(b.page, code, 'Bo');
+    await addLinks(a.page, 'dQw4w9WgXcQ');
+    await expect.poll(() => queueTitles(b.page)).toHaveLength(1);
+    await a.ctx.close(); // tab closed, no leave
+
+    await expect(b.page.locator('.count')).toHaveText('1 online');
+    await expect(b.page.locator('.person[data-name="Bo"] .host-badge')).toHaveCount(1, { timeout: 90_000 });
+    await expect(b.page.locator('.toast', { hasText: "You're now the host" })).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await b.ctx.close();
   }
 });

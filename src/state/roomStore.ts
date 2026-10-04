@@ -33,12 +33,24 @@ export interface RoomState {
   invite: string | null;
   /** a room just created: show its code before entering */
   pendingRoom: RoomRef | null;
+  /** this person's volume, 0 to 100 (local only) */
+  volume: number;
   chatOpen: boolean;
   unread: number;
   toasts: Toast[];
   pending: number;
 
   patch: (p: Partial<RoomState>) => void;
+}
+
+const VOLUME_KEY = 'jam_volume';
+function readVolume(): number {
+  try {
+    const v = Number(globalThis.localStorage?.getItem(VOLUME_KEY));
+    return Number.isFinite(v) && globalThis.localStorage?.getItem(VOLUME_KEY) !== null ? Math.max(0, Math.min(100, v)) : 80;
+  } catch {
+    return 80;
+  }
 }
 
 export const useRoomStore = create<RoomState>()((set) => ({
@@ -58,6 +70,7 @@ export const useRoomStore = create<RoomState>()((set) => ({
   durationSec: 0,
   invite: null,
   pendingRoom: null,
+  volume: readVolume(),
   chatOpen: false,
   unread: 0,
   toasts: [],
@@ -86,3 +99,14 @@ export const selectHostName = (s: RoomState): string | null => {
   const host = s.members.find((m) => m.user_id === s.room?.host_id);
   return host?.name ?? null;
 };
+
+/** Volume is this person's only; it never touches the room. */
+export function setVolume(percent: number) {
+  const v = Math.max(0, Math.min(100, Math.round(percent)));
+  useRoomStore.setState({ volume: v });
+  try {
+    globalThis.localStorage?.setItem(VOLUME_KEY, String(v));
+  } catch {
+    /* storage blocked */
+  }
+}

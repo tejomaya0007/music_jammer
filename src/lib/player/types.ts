@@ -14,6 +14,8 @@ export interface Player {
   getCurrentTime(): number;
   /** Length in seconds, 0 when unknown. */
   getDuration(): number;
+  /** 0 to 100 */
+  setVolume(percent: number): void;
   isPlaying(): boolean;
   onEvent(cb: (e: PlayerEvent) => void): () => void;
   destroy(): void;

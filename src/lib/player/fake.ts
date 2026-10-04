@@ -23,6 +23,7 @@ export function createFakePlayer(node?: HTMLElement): Player {
   let startedAt = 0; // wall clock ms when playback last started (0 = paused)
   let duration = DEFAULT_LEN;
   let ended = false;
+  let volume = 100;
   const listeners = new Set<(e: PlayerEvent) => void>();
 
   const emit = (e: PlayerEvent) => listeners.forEach((cb) => cb(e));
@@ -89,6 +90,7 @@ export function createFakePlayer(node?: HTMLElement): Player {
     },
     getCurrentTime: () => (videoId ? current() : 0),
     getDuration: () => (videoId ? duration : 0),
+    setVolume: (percent) => { volume = Math.max(0, Math.min(100, percent)); expose('volume', String(volume)); },
     isPlaying: () => startedAt !== 0,
     onEvent(cb) {
       listeners.add(cb);

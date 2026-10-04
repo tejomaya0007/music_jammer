@@ -43,16 +43,16 @@ export function Queue() {
   };
 
   return (
-    <section aria-label="Queue">
-      <div className="section-head">
-        <h2>Queue</h2>
-        <span className="hint num">{songs.length} / {QUEUE_CAP}</span>
-      </div>
+    <section className="queue-panel" aria-label="Up next">
+      <header className="queue-head">
+        <h2 className="panel-title">Up next</h2>
+        <span className="hint num">{songs.length} {songs.length === 1 ? 'song' : 'songs'} · {QUEUE_CAP} max</span>
+      </header>
 
       <AddBar />
 
       {songs.length === 0 ? (
-        <p className="empty">Nothing queued yet. Paste a YouTube link above.</p>
+        <p className="empty">Nothing queued yet. Paste a YouTube link to start the first track.</p>
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragStart={onDragStart} onDragEnd={onDragEnd} onDragCancel={() => setActiveId(null)}>
           <SortableContext items={songs.map((s) => s.id)} strategy={verticalListSortingStrategy}>
@@ -142,7 +142,7 @@ function AddBar() {
         className="input"
         rows={1}
         value={text}
-        placeholder="Paste a YouTube link, or several"
+        placeholder="Paste a YouTube link"
         onChange={(e) => setText(e.target.value)}
         onKeyDown={onKey}
         spellCheck={false}

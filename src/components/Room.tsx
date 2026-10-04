@@ -1,39 +1,50 @@
 import { useMemo, useRef, useState } from 'react';
 import { usePlayer } from '../hooks/usePlayer';
 import { useMediaSession } from '../hooks/useMediaSession';
-import { useRoomStore, selectCurrentSong, selectOnlineCount, toast } from '../state/roomStore';
-import { leaveRoom } from '../state/session';
+import { selectOnlineCount, selectCurrentSong, toast, useRoomStore } from '../state/roomStore';
+import { leaveRoom, playPause } from '../state/session';
 import { shareUrl } from '../lib/share';
-import { NowPlaying } from './NowPlaying';
+import { Wordmark } from './brand/Wordmark';
+import { Stage } from './stage/Stage';
+import { VideoDock } from './stage/VideoDock';
 import { Queue } from './Queue';
-import { ChatBar } from './Chat';
-import { PeopleSheet } from './People';
-import { Avatar } from './parts';
-import { CrownIcon, ShareIcon } from './icons';
+import { ChatPanel } from './Chat';
+import { MemberStack, MemberPanel } from './People';
+import { InviteSheet } from './InviteSheet';
+import { PauseGlyph, PlayGlyph } from './skins/glyphs';
 
-const STACK_MAX = 4;
+export type RoomTab = 'player' | 'queue' | 'chat';
 
+/**
+ * The room. One layout, three arrangements:
+ *  - phone and tablet: one panel at a time (Player, Queue, Chat tabs), mini-player above the tab bar
+ *  - desktop (1024 px and up): the stage on the left, the rail (Queue above, Chat below) on the right
+ * All panels stay mounted, so the YouTube player is never reloaded when the tab changes.
+ */
 export function Room() {
   const code = useRoomStore((s) => s.code);
-  const allMembers = useRoomStore((s) => s.members);
-  const members = useMemo(() => allMembers.filter((m) => !m.is_kicked), [allMembers]);
   const online = useRoomStore((s) => s.online);
-  const hostId = useRoomStore((s) => s.room?.host_id ?? null);
   const onlineCount = useRoomStore(selectOnlineCount);
-  const art = useRoomStore(selectCurrentSong)?.thumbnail ?? null;
+  const unread = useRoomStore((s) => s.unread);
+  const song = useRoomStore(selectCurrentSong);
+  const isPlaying = useRoomStore((s) => s.room?.is_playing ?? false);
+  const [tab, setTab] = useState<RoomTab>('player');
+  const [showVideo, setShowVideo] = useState(false);
   const [peopleOpen, setPeopleOpen] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   const mountRef = useRef<HTMLDivElement>(null);
   usePlayer(mountRef);
   useMediaSession();
 
-  // online people first, so the stack shows who is actually around
-  const ordered = useMemo(
-    () => [...members].sort((a, b) => Number(online.includes(b.user_id)) - Number(online.includes(a.user_id))),
-    [members, online],
+  const tabs = useMemo<Array<{ id: RoomTab; label: string; badge?: number }>>(
+    () => [
+      { id: 'player', label: 'Player' },
+      { id: 'queue', label: 'Queue' },
+      { id: 'chat', label: 'Chat', badge: unread },
+    ],
+    [unread],
   );
-  const shown = ordered.slice(0, STACK_MAX);
-  const hidden = ordered.length - shown.length;
 
   const share = async () => {
     if (!code) return;
@@ -44,51 +55,66 @@ export function Room() {
         return;
       }
       await navigator.clipboard.writeText(url);
-      toast('Link copied. Send it to your friends.');
+      toast('Link copied');
     } catch {
       toast(`Share this code: ${code}`);
     }
   };
 
   return (
-    <div className="app">
-      {art && <div className="ambient" style={{ backgroundImage: `url(${art})` }} aria-hidden />}
-
-      <header className="topbar">
-        <div className="brand">
-          <span className="wordmark">Jam <em>Room</em></span>
-          <span className="code-line num" aria-label={`Room code ${code}`}>{code}</span>
-        </div>
-
-        <button className="people" onClick={() => setPeopleOpen(true)} aria-label={`${onlineCount} online. Open the member list.`}>
-          <span className="stack">
-            {shown.map((m) => {
-              const isOnline = online.includes(m.user_id);
-              return (
-                <span key={m.user_id} className={`person${isOnline ? '' : ' offline'}`} data-name={m.name} title={m.name}>
-                  <Avatar name={m.name} id={m.user_id} online={isOnline} />
-                  {m.user_id === hostId && <CrownIcon className="crown" />}
-                </span>
-              );
-            })}
-            {hidden > 0 && <span className="more num">+{hidden}</span>}
-          </span>
-          <span className="count num">{onlineCount} online</span>
-        </button>
-
-        <button className="icon-btn" onClick={() => void share()} aria-label="Share the room link">
-          <ShareIcon />
-        </button>
-        <button className="btn ghost leave" onClick={() => void leaveRoom()}>Leave</button>
+    <div className="room" data-tab={tab}>
+      <header className="room-header">
+        <Wordmark size="sm" />
+        <span className="code-line num" aria-label={`Room code ${code}`}>{code}</span>
+        <span className="spacer" />
+        <MemberStack
+          online={online}
+          onOpen={() => setPeopleOpen(true)}
+          onlineCount={onlineCount}
+        />
+        <button type="button" className="btn secondary-sm" onClick={() => setInviteOpen(true)}>Invite</button>
+        <button type="button" className="btn ghost leave" onClick={() => void leaveRoom()}>Leave</button>
       </header>
 
-      <main className="screen">
-        <NowPlaying mountRef={mountRef} />
-        <Queue />
-      </main>
+      <div className="room-body">
+        <div className="stage-col">
+          <Stage showVideo={showVideo} onToggleVideo={() => setShowVideo((v) => !v)} />
+        </div>
+        <aside className="rail" aria-label="Queue and chat">
+          <div className="rail-queue"><Queue /></div>
+          <div className="rail-chat"><ChatPanel /></div>
+        </aside>
+      </div>
 
-      <ChatBar />
-      {peopleOpen && <PeopleSheet onClose={() => setPeopleOpen(false)} />}
+      <VideoDock mountRef={mountRef} open={showVideo} onClose={() => setShowVideo(false)} />
+
+      {tab !== 'player' && song && (
+        <div className="mini" aria-label="Now playing">
+          <img className="mini-art" src={song.thumbnail ?? ''} alt="" />
+          <span className="mini-title" title={song.title}>{song.title}</span>
+          <button type="button" className="icon-btn" aria-label={isPlaying ? 'Pause' : 'Play'} onClick={() => void playPause()}>
+            {isPlaying ? <PauseGlyph /> : <PlayGlyph />}
+          </button>
+        </div>
+      )}
+
+      <nav className="tabbar" aria-label="Room sections">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={`tab${tab === t.id ? ' on' : ''}`}
+            aria-current={tab === t.id ? 'page' : undefined}
+            onClick={() => setTab(t.id)}
+          >
+            <span>{t.label}</span>
+            {t.badge ? <span className="tab-badge num" aria-label={`${t.badge} unread`}>{t.badge}</span> : null}
+          </button>
+        ))}
+      </nav>
+
+      {peopleOpen && <MemberPanel onClose={() => setPeopleOpen(false)} />}
+      {inviteOpen && <InviteSheet code={code ?? ''} onShare={() => void share()} onClose={() => setInviteOpen(false)} />}
     </div>
   );
 }

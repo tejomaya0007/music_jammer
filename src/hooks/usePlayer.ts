@@ -21,6 +21,7 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
   const anchorPos = useRoomStore((s) => s.room?.anchor_pos_ms ?? 0);
   const anchorTime = useRoomStore((s) => s.room?.anchor_time ?? '');
   const version = useRoomStore((s) => s.room?.state_version ?? 0);
+  const volume = useRoomStore((s) => s.volume);
 
   // create the player once the room screen (and its mount point) is on screen
   useEffect(() => {
@@ -53,6 +54,11 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
       setPlayer(null);
     };
   }, [mountRef]);
+
+  // this person's volume only, applied whenever the player is ready or the slider moves
+  useEffect(() => {
+    player?.setVolume(volume);
+  }, [player, volume]);
 
   // apply the shared state whenever it changes
   useEffect(() => {

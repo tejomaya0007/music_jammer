@@ -1,7 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRoomStore } from './state/roomStore';
-import { boot } from './state/session';
-import { Home } from './components/Home';
+import { boot, joinByCode } from './state/session';
+import { readProfile } from './lib/profile';
+import { Onboarding } from './screens/Onboarding';
+import { Home } from './screens/Home';
+import { JoinCode } from './screens/JoinCode';
+import { RoomReady } from './screens/RoomReady';
 import { Room } from './components/Room';
 import { Toasts } from './components/Toasts';
 
@@ -16,22 +20,49 @@ function readInviteCode(): string | null {
   return code ? code.trim().toUpperCase().slice(0, 6) : null;
 }
 
-// read the invite once per page load, before StrictMode’s second mount can strip it from the URL
+// read once per page load, before StrictMode's second mount can strip it from the URL
 const initialInvite = readInviteCode();
 
 export function App() {
   const booted = useRoomStore((s) => s.booted);
   const inRoom = useRoomStore((s) => s.roomId !== null);
+  const pending = useRoomStore((s) => s.pendingRoom);
   const invite = useRoomStore((s) => s.invite);
+  const [editing, setEditing] = useState(false);
+  const [joining, setJoining] = useState(false);
+  const [, setProfileRev] = useState(0);
+  const profile = readProfile();
 
   useEffect(() => {
     void boot(initialInvite);
   }, []);
 
+  if (!booted) {
+    return <main className="stage-page"><p className="lede">Tuning in…</p></main>;
+  }
+
   let screen;
-  if (!booted) screen = <main className="home"><p className="lede">Starting…</p></main>;
-  else if (inRoom) screen = <Room />;
-  else screen = <Home inviteCode={invite} />;
+  if (inRoom) {
+    screen = <Room />;
+  } else if (pending) {
+    screen = <RoomReady code={pending.code} />;
+  } else if (!profile || editing) {
+    screen = (
+      <Onboarding
+        onCancel={editing ? () => setEditing(false) : undefined}
+        onDone={(name) => {
+          setProfileRev((n) => n + 1);
+          setEditing(false);
+          // a shared link with no profile: onboarding first, then join automatically
+          if (invite) void joinByCode(invite, name);
+        }}
+      />
+    );
+  } else if (joining || invite) {
+    screen = <JoinCode initial={invite ?? ''} onBack={() => setJoining(false)} />;
+  } else {
+    screen = <Home onJoin={() => setJoining(true)} onEditProfile={() => setEditing(true)} />;
+  }
 
   return (
     <>
