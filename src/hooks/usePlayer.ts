@@ -4,7 +4,7 @@ import { driftCorrectionTarget, expectedPositionMs } from '../lib/sync';
 import { selectCurrentSong, toast, useRoomStore } from '../state/roomStore';
 import { currentPosMs, reportSongEnded, serverNowMs } from '../state/session';
 
-const DRIFT_LOOP_MS = 2000;
+const DRIFT_LOOP_MS = 1000;
 
 /**
  * Connects the video player to the shared room state.
@@ -92,8 +92,10 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
       useRoomStore.setState({ durationSec: player.getDuration() });
       return;
     }
-    if (isPlaying && !player.isPlaying()) player.play();
-    if (!isPlaying && player.isPlaying()) player.pause();
+    // always send the room's state: YouTube reports BUFFERING (not PLAYING) while a video stalls,
+    // so checking isPlaying() first let a pause go unsent. play and pause are idempotent.
+    if (isPlaying) player.play();
+    else player.pause();
     // an explicit change (seek, pause, skip) corrects at once, no cool-down
     const driftMs = Math.abs(player.getCurrentTime() * 1000 - expectedSec * 1000);
     if (driftMs > 300) player.seekTo(expectedSec);

@@ -133,18 +133,19 @@ describe('reorderPosition (midpoint)', () => {
 describe('driftCorrectionTarget', () => {
   const base = { playerPosMs: 10_000, expectedMs: 10_000, isPlaying: true, buffering: false, nowMs: 100_000, lastCorrectionMs: 0 };
 
-  it('no correction when within 300 ms', () => {
-    expect(driftCorrectionTarget({ ...base, playerPosMs: 10_299 })).toBeNull();
-    expect(driftCorrectionTarget({ ...base, playerPosMs: 9_701 })).toBeNull();
+  it('no correction when within 250 ms', () => {
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 10_240 })).toBeNull();
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 9_760 })).toBeNull();
   });
 
-  it('corrects when drift is over 300 ms', () => {
-    expect(driftCorrectionTarget({ ...base, playerPosMs: 10_301, expectedMs: 10_000 })).toBe(10_000);
+  it('corrects when drift is over 250 ms', () => {
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 10_260, expectedMs: 10_000 })).toBe(10_000);
   });
 
-  it('skips while paused, buffering, or in cool-down', () => {
+  it('skips while paused, small drift while buffering, or in cool-down', () => {
     expect(driftCorrectionTarget({ ...base, playerPosMs: 20_000, isPlaying: false })).toBeNull();
-    expect(driftCorrectionTarget({ ...base, playerPosMs: 20_000, buffering: true })).toBeNull();
-    expect(driftCorrectionTarget({ ...base, playerPosMs: 20_000, nowMs: 2000, lastCorrectionMs: 1000 })).toBeNull();
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 10_800, buffering: true })).toBeNull();
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 20_000, buffering: true })).toBe(10_000);
+    expect(driftCorrectionTarget({ ...base, playerPosMs: 20_000, nowMs: 2000, lastCorrectionMs: 1500 })).toBeNull();
   });
 });

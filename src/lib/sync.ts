@@ -56,8 +56,10 @@ export function reorderPosition(prev: number | null, next: number | null): numbe
  * Drift loop decision. Correct only while playing, not buffering, and not
  * within the 2.5 s cool-down after the last correction.
  */
-export const DRIFT_TOLERANCE_MS = 300;
-export const DRIFT_COOLDOWN_MS = 2500;
+export const DRIFT_TOLERANCE_MS = 250;
+export const DRIFT_COOLDOWN_MS = 1000;
+/** while buffering, small drift waits; a gap this large is corrected anyway (a stuck buffer must not hide drift) */
+export const BUFFER_OVERRIDE_MS = 1500;
 
 export function driftCorrectionTarget(input: {
   playerPosMs: number;
@@ -67,8 +69,10 @@ export function driftCorrectionTarget(input: {
   nowMs: number;
   lastCorrectionMs: number;
 }): number | null {
-  if (!input.isPlaying || input.buffering) return null;
+  if (!input.isPlaying) return null;
+  const gap = Math.abs(input.playerPosMs - input.expectedMs);
+  if (input.buffering && gap < BUFFER_OVERRIDE_MS) return null;
   if (input.nowMs - input.lastCorrectionMs < DRIFT_COOLDOWN_MS) return null;
-  if (Math.abs(input.playerPosMs - input.expectedMs) <= DRIFT_TOLERANCE_MS) return null;
+  if (gap <= DRIFT_TOLERANCE_MS) return null;
   return input.expectedMs;
 }

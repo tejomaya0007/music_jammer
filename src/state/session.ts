@@ -14,7 +14,7 @@ import { useRoomStore, toast, type RoomState, type Toast } from './roomStore';
 
 const ACTIVE_KEY = 'jam:active-room';
 const HEARTBEAT_MS = 15_000;
-const CLOCK_EVERY_MS = 5 * 60_000;
+const CLOCK_EVERY_MS = 60_000;
 const POLL_MS = 4_000;
 
 type Unsub = () => void;
