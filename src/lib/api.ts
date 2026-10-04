@@ -20,8 +20,9 @@ export const api = {
   snapshot: (roomId: string): Promise<RoomSnapshot> => backend.snapshot(roomId),
   subscribe: backend.subscribe.bind(backend),
 
-  createRoom: (name: string) => backend.rpc<RoomRef>('create_room', { p_name: name }),
-  joinRoom: (code: string, name: string) => backend.rpc<RoomRef>('join_room', { p_code: code, p_name: name }),
+  createRoom: (name: string, avatar: string | null) => backend.rpc<RoomRef>('create_room', { p_name: name, p_avatar: avatar }),
+  joinRoom: (code: string, name: string, avatar: string | null) =>
+    backend.rpc<RoomRef>('join_room', { p_code: code, p_name: name, p_avatar: avatar }),
   leaveRoom: (roomId: string) => backend.rpc<void>('leave_room', { p_room: roomId }),
   heartbeat: (roomId: string) => backend.rpc<void>('heartbeat', { p_room: roomId }),
   kickMember: (roomId: string, userId: string) => backend.rpc<void>('kick_member', { p_room: roomId, p_user: userId }),

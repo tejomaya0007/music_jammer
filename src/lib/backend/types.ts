@@ -29,6 +29,8 @@ export interface SongRow {
 export interface MemberRow {
   user_id: string;
   name: string;
+  /** "<icon>:<colour>" or null */
+  avatar: string | null;
   joined_at: string;
   is_kicked: boolean;
 }

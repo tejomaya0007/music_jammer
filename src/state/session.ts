@@ -8,9 +8,10 @@ import { estimateClockOffset, reorderPosition, type ClockSample } from '../lib/s
 import { parseVideoLinks } from '../lib/link';
 import { QUEUE_CAP, CHAT_MAX } from '../lib/config';
 import { readStore, writeStore } from '../lib/storage';
+import { readProfile, saveProfile } from '../lib/profile';
+import { formatAvatar, randomAvatar } from '../lib/avatars';
 import { useRoomStore, toast, type RoomState, type Toast } from './roomStore';
 
-const NAME_KEY = 'jam:name';
 const ACTIVE_KEY = 'jam:active-room';
 const HEARTBEAT_MS = 15_000;
 const CLOCK_EVERY_MS = 5 * 60_000;
@@ -42,11 +43,16 @@ async function run<T>(fn: () => Promise<T>, errorPrefix = ''): Promise<T | undef
 }
 
 export function getStoredName(): string {
-  return readStore(NAME_KEY) ?? '';
+  return readProfile()?.name ?? '';
+}
+
+/** The avatar this person chose, as stored; a random one if the profile has none yet. */
+export function getStoredAvatar(): string {
+  return readProfile()?.avatar ?? formatAvatar(randomAvatar());
 }
 
 export function setStoredName(name: string) {
-  writeStore(NAME_KEY, name);
+  saveProfile({ name, avatar: getStoredAvatar() });
   patch({ name });
 }
 
@@ -93,7 +99,7 @@ export async function createRoom(name: string) {
   const clean = name.trim();
   if (!clean) return toast('Add your name to start', 'error');
   setStoredName(clean);
-  const r = await run(() => api.createRoom(clean));
+  const r = await run(() => api.createRoom(clean, getStoredAvatar()));
   if (r) patch({ pendingRoom: r });
 }
 
@@ -118,7 +124,7 @@ export async function joinByCode(code: string, name: string) {
   if (!who) return toast('Enter a display name first', 'error');
   if (!clean) return toast('Enter a room code', 'error');
   setStoredName(who);
-  const r = await run(() => api.joinRoom(clean, who));
+  const r = await run(() => api.joinRoom(clean, who, getStoredAvatar()));
   if (r) await enter(r.id, r.code);
   else writeStore(ACTIVE_KEY, null);
 }

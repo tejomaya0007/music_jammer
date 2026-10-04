@@ -45,7 +45,7 @@ const song = (id: string, title: string, over: Partial<SongRow> = {}): SongRow =
   id, room_id: 'r1', video_id: `vid${id}`.padEnd(11, 'x').slice(0, 11), title, thumbnail: `https://i.ytimg.com/vi/${id}/mq.jpg`,
   added_by: 'me-user', position: Number(id.replace(/\D/g, '')) || 1, created_at: new Date().toISOString(), ...over,
 });
-const member = (user_id: string, name: string): MemberRow => ({ user_id, name, joined_at: new Date().toISOString(), is_kicked: false });
+const member = (user_id: string, name: string): MemberRow => ({ user_id, name, avatar: null, joined_at: new Date().toISOString(), is_kicked: false });
 
 function wrap(ui: ReactNode) {
   return (

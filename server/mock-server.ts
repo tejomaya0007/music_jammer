@@ -104,7 +104,7 @@ async function handleSnapshot(roomId: string, user: string) {
     if (!room) return { room: null, songs: [], members: [], messages: [] };
     const songs = (await tx.query('select * from public.songs where room_id = $1 order by position', [roomId])).rows;
     const members = (await tx.query(
-      'select user_id, name, joined_at, is_kicked from public.room_members where room_id = $1 order by joined_at',
+      'select user_id, name, avatar, joined_at, is_kicked from public.room_members where room_id = $1 order by joined_at',
       [roomId],
     )).rows;
     const messages = (await tx.query(

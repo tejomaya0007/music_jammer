@@ -41,7 +41,7 @@ export const supabaseBackend: Backend = {
     const [room, songs, members, messages] = await Promise.all([
       s.from('rooms').select('*').eq('id', roomId).maybeSingle(),
       s.from('songs').select('*').eq('room_id', roomId).order('position', { ascending: true }),
-      s.from('room_members').select('user_id,name,joined_at,is_kicked').eq('room_id', roomId).order('joined_at', { ascending: true }),
+      s.from('room_members').select('user_id,name,avatar,joined_at,is_kicked').eq('room_id', roomId).order('joined_at', { ascending: true }),
       s.from('messages').select('*').eq('room_id', roomId).order('created_at', { ascending: false }).order('id', { ascending: false }).limit(100),
     ]);
     for (const r of [room, songs, members, messages]) if (r.error) throw new Error(r.error.message);

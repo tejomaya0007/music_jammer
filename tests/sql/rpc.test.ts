@@ -756,3 +756,43 @@ describe('member presence rows never change room realtime', () => {
     expect(after.is_playing).toBe(before.is_playing);
   });
 });
+
+describe('avatars', () => {
+  const avatarOf = async (roomId: string, uid: string) =>
+    (await q('select avatar from room_members where room_id = $1 and user_id = $2', [roomId, uid]))[0].avatar;
+
+  it('create stores the avatar, join stores it for the new member', async () => {
+    const host = await newUser(db);
+    const room = (await asUser(db, host, 'select public.create_room($1, $2) as r', ['Ana', 'cassette:teal']))[0] as any;
+    expect(await avatarOf(room.r.id, host)).toBe('cassette:teal');
+    const guest = await newUser(db);
+    await asUser(db, guest, 'select public.join_room($1, $2, $3)', [room.r.code, 'Bo', 'vinyl:amber']);
+    expect(await avatarOf(room.r.id, guest)).toBe('vinyl:amber');
+  });
+
+  it('rejects junk avatar strings on create and join', async () => {
+    const host = await newUser(db);
+    for (const bad of ['', 'cassette', 'Cassette:Teal', 'x:y', 'cassette:teal;drop', 'a'.repeat(40) + ':amber', 'cassette:teal ']) {
+      const r = await tryAs(db, host, 'select public.create_room($1, $2)', ['Ana', bad]);
+      expect(r, bad).toEqual({ ok: false, error: 'Invalid avatar' });
+    }
+    const room = await createRoom(db, host, 'Host');
+    const guest = await newUser(db);
+    const r = await tryAs(db, guest, 'select public.join_room($1, $2, $3)', [room.code, 'Bo', 'bad avatar']);
+    expect(r).toEqual({ ok: false, error: 'Invalid avatar' });
+  });
+
+  it('rejoining updates the avatar; rejoining without one keeps the stored avatar', async () => {
+    const host = await newUser(db);
+    const room = await createRoom(db, host, 'Host');
+    const guest = await newUser(db);
+    await joinRoom(db, guest, room.code, 'Bo');
+    expect(await avatarOf(room.id, guest)).toBeNull();
+    await asUser(db, guest, 'select public.join_room($1, $2, $3)', [room.code, 'Bo', 'ipod:rose']);
+    expect(await avatarOf(room.id, guest)).toBe('ipod:rose');
+    await asUser(db, guest, 'select public.join_room($1, $2, $3)', [room.code, 'Bo', 'radio:sky']);
+    expect(await avatarOf(room.id, guest)).toBe('radio:sky');
+    await asUser(db, guest, 'select public.join_room($1, $2)', [room.code, 'Bo']);
+    expect(await avatarOf(room.id, guest)).toBe('radio:sky');
+  });
+});

@@ -26,6 +26,8 @@ create table public.room_members (
   room_id   uuid not null references public.rooms(id) on delete cascade,
   user_id   uuid not null references auth.users(id) on delete cascade,
   name      text not null,
+  -- "<icon>:<color>", e.g. "cassette:teal"; null = no avatar chosen (initial shown instead)
+  avatar    text check (avatar is null or avatar ~ '^[a-z-]{2,20}:[a-z]{2,10}$'),
   joined_at timestamptz not null default now(),
   is_kicked boolean not null default false,
   primary key (room_id, user_id)
@@ -137,7 +139,7 @@ grant select on public.rooms, public.room_members, public.songs, public.messages
 alter publication supabase_realtime add table public.rooms, public.songs, public.room_members, public.messages;
 
 -- ---------- room lifecycle ----------
-create or replace function public.create_room(p_name text)
+create or replace function public.create_room(p_name text, p_avatar text default null)
 returns json language plpgsql security definer set search_path = public as $$
 declare
   v_code text; v_id uuid; tries integer := 0; nm text;
@@ -145,6 +147,7 @@ begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
   nm := left(trim(coalesce(p_name, '')), 30);
   if nm = '' then raise exception 'Please enter a name'; end if;
+  if p_avatar is not null and p_avatar !~ '^[a-z-]{2,20}:[a-z]{2,10}$' then raise exception 'Invalid avatar'; end if;
   loop
     v_code := gen_code();
     begin
@@ -155,13 +158,13 @@ begin
       if tries > 10 then raise; end if;
     end;
   end loop;
-  insert into room_members (room_id, user_id, name) values (v_id, auth.uid(), nm);
+  insert into room_members (room_id, user_id, name, avatar) values (v_id, auth.uid(), nm, p_avatar);
   insert into member_seen (room_id, user_id) values (v_id, auth.uid());
   insert into messages (room_id, kind, text) values (v_id, 'system', nm || ' created the room');
   return json_build_object('id', v_id, 'code', v_code);
 end $$;
 
-create or replace function public.join_room(p_code text, p_name text)
+create or replace function public.join_room(p_code text, p_name text, p_avatar text default null)
 returns json language plpgsql security definer set search_path = public as $$
 declare
   r rooms; m room_members; cnt integer; nm text; pos integer;
@@ -169,6 +172,7 @@ begin
   if auth.uid() is null then raise exception 'Not signed in'; end if;
   nm := left(trim(coalesce(p_name, '')), 30);
   if nm = '' then raise exception 'Please enter a name'; end if;
+  if p_avatar is not null and p_avatar !~ '^[a-z-]{2,20}:[a-z]{2,10}$' then raise exception 'Invalid avatar'; end if;
 
   select * into r from rooms where code = upper(trim(p_code)) for update;
   if not found or r.status = 'closed' then raise exception 'Room not found or closed'; end if;
@@ -176,11 +180,13 @@ begin
   select * into m from room_members where room_id = r.id and user_id = auth.uid();
   if found then
     if m.is_kicked then raise exception 'You were removed from this room'; end if;
-    update room_members set name = nm where room_id = r.id and user_id = auth.uid();
+    -- rejoining refreshes name and avatar (a null avatar keeps the stored one)
+    update room_members set name = nm, avatar = coalesce(p_avatar, avatar)
+     where room_id = r.id and user_id = auth.uid();
   else
     select count(*) into cnt from room_members where room_id = r.id and not is_kicked;
     if cnt >= r.max_members then raise exception 'Room is full'; end if;
-    insert into room_members (room_id, user_id, name) values (r.id, auth.uid(), nm);
+    insert into room_members (room_id, user_id, name, avatar) values (r.id, auth.uid(), nm, p_avatar);
     insert into messages (room_id, kind, text) values (r.id, 'system', nm || ' joined');
   end if;
 
