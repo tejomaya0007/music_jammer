@@ -106,6 +106,7 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
   useEffect(() => {
     if (!player) return;
     let lastCorrection = 0;
+    const rate = { current: 1 };
     // one drift check; the rooms row is the truth, the player follows it
     const check = (cooldown: boolean) => {
       const st = useRoomStore.getState();
@@ -125,26 +126,25 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
         nowMs: Date.now(),
         lastCorrectionMs: cooldown ? lastCorrection : 0,
       });
+      // speed only changes when it must: setting the same rate again makes some phones re-buffer
+      const setRate = (r: number) => {
+        if (rate.current === r) return;
+        rate.current = r;
+        player.setPlaybackRate(r);
+      };
       if (target !== null) {
         player.seekTo(target / 1000);
-        player.setPlaybackRate(1);
+        setRate(1);
         lastCorrection = Date.now();
         useRoomStore.setState({ lastCorrectionMs: lastCorrection });
       } else if (st.room.is_playing && !buffering.current) {
-        player.setPlaybackRate(driftRate(playerPosMs, expectedMs));
+        setRate(driftRate(playerPosMs, expectedMs));
       } else {
-        player.setPlaybackRate(1);
+        setRate(1);
       }
     };
     const timer = setInterval(() => check(true), DRIFT_LOOP_MS);
-    // a fresh load reports 'playing' only after buffering: correct right then, not two seconds later
-    const unsub = player.onEvent((e) => {
-      if (e.type === 'playing') check(false);
-    });
-    return () => {
-      clearInterval(timer);
-      unsub();
-    };
+    return () => clearInterval(timer);
   }, [player]);
 
   return player;
