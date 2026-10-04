@@ -2,6 +2,27 @@
 
 Run on this machine (Windows 11, Node 24, Chromium from Playwright). Every number below comes from a run in this session; nothing is estimated.
 
+## Round 3 status (DESIGN.md rebuild, sync fix, avatars)
+
+Run on commit e066c97.
+
+| Check | Result |
+| --- | --- |
+| E2E (three browser contexts, desktop layout) | 9 / 9 passed, including the new mid-song late-join test and the 40 s host-disconnect takeover |
+| Vitest (SQL, unit, component, PWA) | 150 / 150 passed (SQL 79, unit 44, component 17, PWA 10) |
+| Lint | 0 errors, 0 warnings |
+| Typecheck | clean |
+| Real YouTube, late joiner | joiner clock +15 s, -15 s and exact all converge within about 3 s and stay within 0.1 s of the host |
+
+What changed in this round:
+- Late joiners land on the room's moment (clock sync finishes before the Join gate).
+- Avatars are stored with members and shown to others (schema check, rejoin updates, tests).
+- The whole look and layout were rebuilt from DESIGN.md: tokens, self-hosted fonts, onboarding, home, ticket, six-box join, responsive room, three skins.
+
+Not verified on a real phone yet: the new layouts at phone size (checked only in screenshots), the three skins' feel and sound, and the install prompt.
+
+Not built yet from DESIGN.md: power-on moment (7.5), QR code (6.3), install link (6.2), axe and screenshot assertions (section 16).
+
 ## Round 2 status (latest code)
 
 - Lint: clean (0 errors, 0 warnings). Typecheck: clean. Production build: passes.
