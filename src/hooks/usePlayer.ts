@@ -83,7 +83,8 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
   useEffect(() => {
     if (!player) return;
     let lastCorrection = 0;
-    const timer = setInterval(() => {
+    // one drift check; the rooms row is the truth, the player follows it
+    const check = (cooldown: boolean) => {
       const st = useRoomStore.getState();
       if (!st.unlocked || !st.room || !loadedSongId.current) return;
       const duration = player.getDuration();
@@ -97,15 +98,23 @@ export function usePlayer(mountRef: RefObject<HTMLDivElement | null>): Player | 
         isPlaying: st.room.is_playing,
         buffering: buffering.current,
         nowMs: Date.now(),
-        lastCorrectionMs: lastCorrection,
+        lastCorrectionMs: cooldown ? lastCorrection : 0,
       });
       if (target !== null) {
         player.seekTo(target / 1000);
         lastCorrection = Date.now();
         useRoomStore.setState({ lastCorrectionMs: lastCorrection });
       }
-    }, DRIFT_LOOP_MS);
-    return () => clearInterval(timer);
+    };
+    const timer = setInterval(() => check(true), DRIFT_LOOP_MS);
+    // a fresh load reports 'playing' only after buffering: correct right then, not two seconds later
+    const unsub = player.onEvent((e) => {
+      if (e.type === 'playing') check(false);
+    });
+    return () => {
+      clearInterval(timer);
+      unsub();
+    };
   }, [player]);
 
   return player;

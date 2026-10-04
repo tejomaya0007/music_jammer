@@ -271,3 +271,29 @@ test('host disconnects without leaving: after about 40 s the next person takes o
     await b.ctx.close();
   }
 });
+
+test('a friend who joins mid-song lands on the same moment as the room', async ({ browser }) => {
+  test.setTimeout(120_000);
+  const a = await friend(browser);
+  const b = await friend(browser);
+  const c = await friend(browser);
+  try {
+    const code = await createRoom(a.page, 'Ana');
+    await joinByLink(b.page, code, 'Bo');
+    await addLinks(a.page, 'dQw4w9WgXcQ');
+    await tapToJoinMusic(a.page);
+    await tapToJoinMusic(b.page);
+    await expect.poll(() => isPlaying(b.page)).toBe(true);
+    await a.page.waitForTimeout(6000);
+
+    await joinByLink(c.page, code, 'Cy');
+    await tapToJoinMusic(c.page);
+    await expect.poll(() => isPlaying(c.page)).toBe(true);
+    // all three within about a second of each other, and playing well past the start
+    await expect.poll(() => positionSec(c.page)).toBeGreaterThan(5);
+    await expect.poll(async () => Math.abs((await positionSec(a.page)) - (await positionSec(c.page)))).toBeLessThan(1.5);
+    await expect.poll(async () => Math.abs((await positionSec(b.page)) - (await positionSec(c.page)))).toBeLessThan(1.5);
+  } finally {
+    for (const f of [a, b, c]) await f.ctx.close();
+  }
+});

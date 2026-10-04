@@ -124,9 +124,10 @@ async function route(req: http.IncomingMessage, res: http.ServerResponse) {
   if (req.method === 'GET' && path === `${BASE}/health`) return json(res, 200, { ok: true });
 
   if (req.method === 'POST' && path === `${BASE}/reset`) {
+    // truncate in place: creating a new PGlite instance per reset leaks WebAssembly memory
+    // and crashes the process after many test runs
     await serial(async () => {
-      await db.close();
-      db = await createDb();
+      await db.exec('truncate public.messages, public.songs, public.member_seen, public.room_members, public.rooms, auth.users cascade');
     });
     return json(res, 200, { ok: true });
   }

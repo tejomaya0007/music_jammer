@@ -128,8 +128,10 @@ async function enter(roomId: string, code: string) {
   // the invite belongs to the first visit only: leaving later must not reopen the join form
   patch({ roomId, code, unlocked: false, chatOpen: false, unread: 0, invite: null });
   writeStore(ACTIVE_KEY, JSON.stringify({ code, name: get().name }));
+  // the clock offset must be known before the room shows its "Join in" gate: otherwise a phone
+  // whose clock differs from the room's starts the song at the wrong moment
+  await syncClock();
   await refresh();
-  void syncClock();
   startRealtime(roomId);
 }
 
