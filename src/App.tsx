@@ -16,20 +16,22 @@ function readInviteCode(): string | null {
   return code ? code.trim().toUpperCase().slice(0, 6) : null;
 }
 
-const inviteCode = readInviteCode();
+// read the invite once per page load, before StrictMode’s second mount can strip it from the URL
+const initialInvite = readInviteCode();
 
 export function App() {
   const booted = useRoomStore((s) => s.booted);
   const inRoom = useRoomStore((s) => s.roomId !== null);
+  const invite = useRoomStore((s) => s.invite);
 
   useEffect(() => {
-    void boot(inviteCode);
+    void boot(initialInvite);
   }, []);
 
   let screen;
   if (!booted) screen = <main className="home"><p className="lede">Starting…</p></main>;
   else if (inRoom) screen = <Room />;
-  else screen = <Home inviteCode={inviteCode} />;
+  else screen = <Home inviteCode={invite} />;
 
   return (
     <>

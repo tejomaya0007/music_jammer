@@ -28,30 +28,31 @@ export async function openApp(page: Page, path = '/') {
 export async function createRoom(page: Page, name: string): Promise<string> {
   await openApp(page);
   await page.getByLabel('Your name').fill(name);
-  await page.getByRole('button', { name: 'Start a jam' }).click();
-  const chip = page.locator('.code-chip');
-  await expect(chip).toBeVisible();
-  const code = (await chip.textContent())?.trim() ?? '';
+  await page.getByRole('button', { name: 'Create a room' }).click();
+  const code = (await page.locator('.code-big').textContent())?.trim() ?? '';
   expect(code).toMatch(/^[A-Z2-9]{6}$/);
+  await page.getByRole('button', { name: 'Open room' }).click();
+  await expect(page.locator('.code-line')).toHaveText(code);
   return code;
 }
 
 export async function joinByCode(page: Page, name: string, code: string) {
   await openApp(page);
   await page.getByLabel('Your name').fill(name);
+  await page.getByRole('button', { name: 'Join a room' }).click();
   await page.getByLabel('Room code').fill(code);
-  await page.getByRole('button', { name: 'Join', exact: true }).click();
-  await expect(page.locator('.code-chip')).toHaveText(code.toUpperCase());
+  await page.getByRole('button', { name: 'Join the room' }).click();
+  await expect(page.locator('.code-line')).toHaveText(code.toUpperCase());
 }
 
-/** Share link: opening it with no name stored opens home with the code filled. */
+/** Share link: opens the join form with the code filled in; a stored name joins at once. */
 export async function joinByLink(page: Page, code: string, name?: string) {
   await openApp(page, `/?join=${code}`);
   if (name) {
     await page.getByLabel('Your name').fill(name);
-    await page.getByRole('button', { name: 'Join', exact: true }).click();
+    await page.getByRole('button', { name: 'Join the room' }).click();
   }
-  await expect(page.locator('.code-chip')).toHaveText(code.toUpperCase());
+  await expect(page.locator('.code-line')).toHaveText(code.toUpperCase());
 }
 
 /** Wait for the browser-autoplay gate to show, then tap it, the way a friend would. */
@@ -72,7 +73,7 @@ export async function queueTitles(page: Page): Promise<string[]> {
 }
 
 export async function members(page: Page): Promise<string[]> {
-  return page.locator('.people .person').allTextContents();
+  return page.locator('.person').evaluateAll((els) => els.map((e) => e.getAttribute('data-name') ?? ''));
 }
 
 /** Position of the shared playback as this client shows it, in seconds. */

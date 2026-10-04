@@ -9,7 +9,9 @@ import { Queue } from './Queue';
 import { ChatBar } from './Chat';
 import { PeopleSheet } from './People';
 import { Avatar } from './parts';
-import { CrownIcon, ShareIcon, PeopleIcon } from './icons';
+import { CrownIcon, ShareIcon } from './icons';
+
+const STACK_MAX = 4;
 
 export function Room() {
   const code = useRoomStore((s) => s.code);
@@ -24,6 +26,14 @@ export function Room() {
   const mountRef = useRef<HTMLDivElement>(null);
   usePlayer(mountRef);
   useMediaSession();
+
+  // online people first, so the stack shows who is actually around
+  const ordered = useMemo(
+    () => [...members].sort((a, b) => Number(online.includes(b.user_id)) - Number(online.includes(a.user_id))),
+    [members, online],
+  );
+  const shown = ordered.slice(0, STACK_MAX);
+  const hidden = ordered.length - shown.length;
 
   const share = async () => {
     if (!code) return;
@@ -43,29 +53,36 @@ export function Room() {
   return (
     <div className="app">
       {art && <div className="ambient" style={{ backgroundImage: `url(${art})` }} aria-hidden />}
+
       <header className="topbar">
-        <span className="wordmark" style={{ fontSize: '1.5rem' }}>Jam <em style={{ color: 'var(--gold)' }}>Room</em></span>
-        <span className="spacer" />
-        <span className="code-chip num" aria-label={`Room code ${code}`}>{code}</span>
+        <div className="brand">
+          <span className="wordmark">Jam <em>Room</em></span>
+          <span className="code-line num" aria-label={`Room code ${code}`}>{code}</span>
+        </div>
+
+        <button className="people" onClick={() => setPeopleOpen(true)} aria-label={`${onlineCount} online. Open the member list.`}>
+          <span className="stack">
+            {shown.map((m) => {
+              const isOnline = online.includes(m.user_id);
+              return (
+                <span key={m.user_id} className={`person${isOnline ? '' : ' offline'}`} data-name={m.name} title={m.name}>
+                  <Avatar name={m.name} id={m.user_id} online={isOnline} />
+                  {m.user_id === hostId && <CrownIcon className="crown" />}
+                </span>
+              );
+            })}
+            {hidden > 0 && <span className="more num">+{hidden}</span>}
+          </span>
+          <span className="count num">{onlineCount} online</span>
+        </button>
+
         <button className="icon-btn" onClick={() => void share()} aria-label="Share the room link">
           <ShareIcon />
         </button>
-        <button className="btn ghost" onClick={() => void leaveRoom()}>Leave</button>
+        <button className="btn ghost leave" onClick={() => void leaveRoom()}>Leave</button>
       </header>
 
       <main className="screen">
-        <button className="people" onClick={() => setPeopleOpen(true)} aria-label={`${onlineCount} online. Open the member list.`}>
-          {members.map((m) => (
-            <span key={m.user_id} className={`person${online.includes(m.user_id) ? '' : ' offline'}`} style={{ cursor: 'pointer' }}>
-              <Avatar name={m.name} id={m.user_id} online={online.includes(m.user_id)} />
-              {m.name}
-              {m.user_id === hostId && <CrownIcon className="crown" />}
-            </span>
-          ))}
-          <span className="count num">{onlineCount} online</span>
-          <PeopleIcon style={{ width: 16, height: 16, color: 'var(--muted)' }} aria-hidden />
-        </button>
-
         <NowPlaying mountRef={mountRef} />
         <Queue />
       </main>

@@ -8,7 +8,7 @@ import { estimateClockOffset, reorderPosition, type ClockSample } from '../lib/s
 import { parseVideoLinks } from '../lib/link';
 import { QUEUE_CAP, CHAT_MAX } from '../lib/config';
 import { readStore, writeStore } from '../lib/storage';
-import { useRoomStore, toast, type RoomState } from './roomStore';
+import { useRoomStore, toast, type RoomState, type Toast } from './roomStore';
 
 const NAME_KEY = 'jam:name';
 const ACTIVE_KEY = 'jam:active-room';
@@ -56,8 +56,17 @@ export function setStoredName(name: string) {
  *  - invite link, no name yet: the home form opens with the code filled in
  *  - no invite: rejoin the last room (survives a reload)
  */
-export async function boot(inviteCode: string | null = null) {
+let bootRun: Promise<void> | null = null;
+
+/** Runs once per page load (StrictMode mounts twice; the second call must not reset the invite). */
+export function boot(inviteCode: string | null = null): Promise<void> {
+  bootRun ??= startBoot(inviteCode);
+  return bootRun;
+}
+
+async function startBoot(inviteCode: string | null) {
   if (get().booted) return;
+  patch({ invite: inviteCode });
   const userId = await api.signIn().catch((e: Error) => {
     toast(`Could not start: ${e.message}`, 'error');
     return null;
@@ -79,12 +88,28 @@ export async function boot(inviteCode: string | null = null) {
   }
 }
 
+/** Step 1 of creating: make the room and show its code. Entering it is a separate step. */
 export async function createRoom(name: string) {
   const clean = name.trim();
-  if (!clean) return toast('Enter a display name first', 'error');
+  if (!clean) return toast('Add your name to start', 'error');
   setStoredName(clean);
   const r = await run(() => api.createRoom(clean));
-  if (r) await enter(r.id, r.code);
+  if (r) patch({ pendingRoom: r });
+}
+
+/** Step 2: open the room that was just created. */
+export async function openPendingRoom() {
+  const p = get().pendingRoom;
+  if (!p) return;
+  patch({ pendingRoom: null });
+  await enter(p.id, p.code);
+}
+
+/** Back out of a freshly created room: leave it so it goes idle, then return to home. */
+export async function discardPendingRoom() {
+  const p = get().pendingRoom;
+  patch({ pendingRoom: null });
+  if (p) await run(() => api.leaveRoom(p.id));
 }
 
 export async function joinByCode(code: string, name: string) {
@@ -100,7 +125,8 @@ export async function joinByCode(code: string, name: string) {
 
 async function enter(roomId: string, code: string) {
   leaveLocal();
-  patch({ roomId, code, unlocked: false, chatOpen: false, unread: 0 });
+  // the invite belongs to the first visit only: leaving later must not reopen the join form
+  patch({ roomId, code, unlocked: false, chatOpen: false, unread: 0, invite: null });
   writeStore(ACTIVE_KEY, JSON.stringify({ code, name: get().name }));
   await refresh();
   void syncClock();
@@ -212,21 +238,21 @@ function leaveLocal() {
   lastMessageId = null;
 }
 
-function endSession(message?: string) {
+function endSession(message?: string, tone: Toast['tone'] = 'error') {
   leaveLocal();
   writeStore(ACTIVE_KEY, null);
   patch({
     roomId: null, code: null, room: null, songs: [], members: [], messages: [],
     online: [], unlocked: false, unread: 0, chatOpen: false,
   });
-  if (message) toast(message, 'error');
+  if (message) toast(message, tone);
 }
 
 export async function leaveRoom() {
   const { roomId } = get();
   if (!roomId) return;
   await run(() => api.leaveRoom(roomId), 'Could not leave: ');
-  endSession('You left the room.');
+  endSession('You left the room.', 'info');
 }
 
 // ----- host actions -----

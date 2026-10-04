@@ -102,15 +102,12 @@ describe('service worker in Chromium', () => {
       const ctx = await browser.newContext();
       const page = await ctx.newPage();
       await page.goto(URL);
-      await page.waitForFunction(async () => {
-        const reg = await navigator.serviceWorker.getRegistration();
-        return !!reg;
-      }, undefined, { timeout: 30_000 });
+      // `ready` resolves once a worker is active, so there is no race with installation
       const state = await page.evaluate(async () => {
-        const reg = await navigator.serviceWorker.getRegistration();
-        return reg?.active?.state ?? reg?.installing?.state ?? reg?.waiting?.state ?? 'none';
+        const reg = await navigator.serviceWorker.ready;
+        return reg.active ? 'active' : 'none';
       });
-      expect(['activated', 'installed', 'activating', 'installing']).toContain(state);
+      expect(state).toBe('active');
       await ctx.close();
     } finally {
       await browser.close();

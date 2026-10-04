@@ -17,7 +17,8 @@
     "test:unit": "vitest run tests/unit",
     "test:component": "vitest run tests/component",
     "test:pwa": "vitest run tests/pwa",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "dev:local": "vite --mode mock-real"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

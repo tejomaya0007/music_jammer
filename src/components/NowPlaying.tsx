@@ -30,7 +30,8 @@ export function NowPlaying({ mountRef }: { mountRef: RefObject<HTMLDivElement | 
   }, [song?.id, isPlaying]);
 
   const total = duration || 0;
-  const shown = dragging ?? Math.min(position, total || position);
+  // no length yet: show the bar at the start rather than a position it cannot place
+  const shown = dragging ?? (total ? Math.min(position, total) : 0);
   const pct = total ? Math.min(100, (shown / total) * 100) : 0;
 
   return (

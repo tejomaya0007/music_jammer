@@ -12,3 +12,4 @@ playwright-report
 coverage
 .vite
 .claude/
+!.env.mock-real

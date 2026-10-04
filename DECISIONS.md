@@ -91,3 +91,14 @@ Every judgment call made while building Jam Room, in the order they came up. Eac
 
 62. **Room creation is not rate-limited.** Any anonymous user can create rooms. Acceptable for a friends-only app; see DEPLOY.md section 9.
 63. **The mock server trusts the `x-user-id` header.** It is test-only, never deployed, and runs only on 127.0.0.1.
+
+## Round 2: real playback, new home and room screens
+
+64. **Real YouTube mode for local use.** The local dev server used the fake player, so there was no sound and every title was a placeholder. New mode `mock-real` (`.env.mock-real`: `VITE_BACKEND=mock`, `VITE_PLAYER=youtube`), started with `npm run dev:local`. Verified in headless Chromium: the embedded video is playing (not paused, not muted, time advancing) and the real oEmbed title shows. Audible output itself was not heard (no audio device in the test).
+65. **Create a room shows the code first.** Home is: name at top; "Create a room" and "Join a room" pinned to the bottom. Create makes the room and shows its code and invite link with an "Open room" button. Entering is a separate step (`openPendingRoom`); "Back" leaves the fresh room so it goes idle.
+66. **Member avatars moved to a stack on the header's right side**, with online dots and a crown on the host, instead of a row above the player. Online members sort first; more than four collapse into "+N". A count appears from 440 px wide.
+67. **Seek bar shows 0 until the length is known.** Previously the thumb sat at the position while the length showed `--:--`.
+68. **"You left the room" is an info toast, not an error.**
+69. **Invite link bug (fixed).** The `?join=` code was kept for the whole page session, so after leaving a room that came from a link the home screen stayed in join mode. Now stored once per page load and cleared on entering a room.
+70. **StrictMode double-mount bug (fixed).** React mounts twice in development. The second mount read `?join=` again after the first had removed it, and overwrote the invite with null, so a friend opening a share link never got the join form. `boot` now runs once per page load, and the URL is read once at module load.
+71. **Flaky PWA check made deterministic.** The service-worker test raced installation. It now awaits `navigator.serviceWorker.ready` and checks that an active worker exists.

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { MemberRow, MessageRow, RoomRow, SongRow } from '../lib/api';
+import type { MemberRow, MessageRow, RoomRef, RoomRow, SongRow } from '../lib/api';
 
 export interface Toast {
   id: number;
@@ -29,6 +29,10 @@ export interface RoomState {
   /** length of the loaded video in seconds (0 when unknown); shown on the seek bar */
   durationSec: number;
 
+  /** invite code from a shared link; cleared once the room is entered */
+  invite: string | null;
+  /** a room just created: show its code before entering */
+  pendingRoom: RoomRef | null;
   chatOpen: boolean;
   unread: number;
   toasts: Toast[];
@@ -52,6 +56,8 @@ export const useRoomStore = create<RoomState>()((set) => ({
   clockOffset: 0,
   lastCorrectionMs: 0,
   durationSec: 0,
+  invite: null,
+  pendingRoom: null,
   chatOpen: false,
   unread: 0,
   toasts: [],

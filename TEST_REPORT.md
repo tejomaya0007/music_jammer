@@ -2,6 +2,14 @@
 
 Run on this machine (Windows 11, Node 24, Chromium from Playwright). Every number below comes from a run in this session; nothing is estimated.
 
+## Round 2 status (latest code)
+
+- Lint: clean (0 errors, 0 warnings). Typecheck: clean. Production build: passes.
+- E2E: 8 / 8 passed.
+- Vitest: 145 / 145 passed (SQL 76, unit 44, component 15, PWA 10).
+
+Still needs a human: play a real song on a phone and listen for sound; check the create-then-open-room flow and the avatar stack on a real phone.
+
 ## Summary
 
 | Suite | Command | Result |

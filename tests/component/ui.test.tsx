@@ -10,8 +10,10 @@ afterEach(() => cleanup());
 const fake = vi.hoisted(() => ({
   calls: [] as Array<{ fn: string; args: Record<string, unknown> }>,
   rpcResult: undefined as unknown,
+  rpcError: null as string | null,
   rpc: async function (fn: string, args: Record<string, unknown>) {
     fake.calls.push({ fn, args });
+    if (fake.rpcError) throw new Error(fake.rpcError);
     return fake.rpcResult;
   },
 }));
@@ -57,9 +59,10 @@ function wrap(ui: ReactNode) {
 beforeEach(() => {
   fake.calls.length = 0;
   fake.rpcResult = undefined;
+  fake.rpcError = null;
   useRoomStore.setState({
     booted: true, userId: 'me-user', name: 'Ana', roomId: null, code: null, room: null, songs: [], members: [],
-    messages: [], online: [], unlocked: false, unread: 0, chatOpen: false, toasts: [], pending: 0, durationSec: 0,
+    messages: [], online: [], unlocked: false, unread: 0, chatOpen: false, toasts: [], pending: 0, durationSec: 0, pendingRoom: null,
   });
   localStorage.clear();
 });
@@ -67,21 +70,42 @@ beforeEach(() => {
 describe('Home', () => {
   it('asks for a name before creating a room', async () => {
     render(wrap(<Home inviteCode={null} />));
-    fireEvent.click(screen.getByRole('button', { name: 'Start a jam' }));
-    expect(await screen.findByText('Enter a display name first')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Create a room' }));
+    expect(await screen.findByText('Add your name to start')).toBeInTheDocument();
     expect(fake.calls.find((c) => c.fn === 'create_room')).toBeUndefined();
   });
 
-  it('creates a room with the typed name and remembers the name', async () => {
+  it('create shows the new room code before any entering happens', async () => {
     fake.rpcResult = { id: 'r1', code: 'ABC123' };
     render(wrap(<Home inviteCode={null} />));
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: '  Ana  ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Start a jam' }));
-    await waitFor(() => expect(fake.calls.find((c) => c.fn === 'create_room')?.args).toEqual({ p_name: 'Ana' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create a room' }));
+    expect(await screen.findByText('ABC123')).toBeInTheDocument();
+    expect(fake.calls.find((c) => c.fn === 'create_room')?.args).toEqual({ p_name: 'Ana' });
+    expect(useRoomStore.getState().roomId).toBeNull();
     expect(localStorage.getItem('jam:name')).toBe('Ana');
   });
 
-  it('pre-fills the code from an invite link and uppercases typed codes', () => {
+  it('Open room enters the room', async () => {
+    fake.rpcResult = { id: 'r1', code: 'ABC123' };
+    render(wrap(<Home inviteCode={null} />));
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Ana' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create a room' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Open room' }));
+    await waitFor(() => expect(useRoomStore.getState().pendingRoom).toBeNull());
+  });
+
+  it('join a room asks for a code, uppercases it, and joins', async () => {
+    render(wrap(<Home inviteCode={null} />));
+    fireEvent.click(screen.getByRole('button', { name: 'Join a room' }));
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Bo' } });
+    fireEvent.change(screen.getByLabelText('Room code'), { target: { value: 'abc123' } });
+    expect(screen.getByLabelText('Room code')).toHaveValue('ABC123');
+    fireEvent.click(screen.getByRole('button', { name: 'Join the room' }));
+    await waitFor(() => expect(fake.calls.find((c) => c.fn === 'join_room')?.args).toEqual({ p_code: 'ABC123', p_name: 'Bo' }));
+  });
+
+  it('an invite link opens the join form with the code filled in', () => {
     render(wrap(<Home inviteCode="abc123" />));
     expect(screen.getByLabelText('Room code')).toHaveValue('ABC123');
     fireEvent.change(screen.getByLabelText('Room code'), { target: { value: 'xyz' } });
@@ -89,13 +113,13 @@ describe('Home', () => {
   });
 
   it('shows the join error from the database as-is', async () => {
-    fake.rpc = async () => { throw new Error('Room not found or closed'); };
+    fake.rpcError = 'Room not found or closed';
     render(wrap(<Home inviteCode={null} />));
+    fireEvent.click(screen.getByRole('button', { name: 'Join a room' }));
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Bo' } });
     fireEvent.change(screen.getByLabelText('Room code'), { target: { value: 'NOPE42' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Join' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Join the room' }));
     expect(await screen.findByText('Room not found or closed')).toBeInTheDocument();
-    fake.rpc = async function (fn: string, args: Record<string, unknown>) { fake.calls.push({ fn, args }); return fake.rpcResult; };
   });
 });
 

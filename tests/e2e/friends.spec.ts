@@ -191,7 +191,7 @@ test('host leaves and the music keeps playing under a new host, then host kicks 
     await expect(a.page.locator('.home')).toBeVisible();
     // the longest-present member, Bo, becomes host; music still playing
     await expect(b.page.locator('.toast', { hasText: "You're now the host" })).toBeVisible();
-    await expect(b.page.locator('.person', { hasText: 'Bo' }).locator('.crown')).toBeVisible();
+    await expect(b.page.locator('.person[data-name="Bo"]').locator('.crown')).toBeVisible();
     await expect.poll(() => isPlaying(c.page)).toBe(true);
     await expect.poll(() => nowTitle(c.page)).toBe('Fake song dQw4w9WgXcQ');
     await expect(b.page.locator('.count')).toHaveText('2 online');
@@ -202,8 +202,9 @@ test('host leaves and the music keeps playing under a new host, then host kicks 
     await expect(c.page.locator('.home')).toBeVisible();
     // a kicked person cannot get back in with the same code
     await c.page.getByLabel('Your name').fill('Cy');
+    await c.page.getByRole('button', { name: 'Join a room' }).click();
     await c.page.getByLabel('Room code').fill(code);
-    await c.page.getByRole('button', { name: 'Join', exact: true }).click();
+    await c.page.getByRole('button', { name: 'Join the room' }).click();
     await expect(c.page.locator('.toast.error', { hasText: 'You were removed from this room' })).toBeVisible();
     await expect(c.page.locator('.home')).toBeVisible();
     // host closes the room for everyone (the people sheet is still open from the kick)
@@ -222,7 +223,7 @@ test('reload auto-rejoins the same room', async ({ browser }) => {
     await addLinks(a.page, 'dQw4w9WgXcQ');
     await expect.poll(() => queueTitles(a.page)).toHaveLength(1);
     await a.page.reload();
-    await expect(a.page.locator('.code-chip')).toHaveText(code);
+    await expect(a.page.locator('.code-line')).toHaveText(code);
     await expect.poll(() => queueTitles(a.page)).toHaveLength(1);
     await expect(a.page.locator('.count')).toHaveText('1 online');
   } finally {
@@ -263,8 +264,8 @@ test('host disconnects without leaving: after about 40 s the next person takes o
     await a.ctx.close(); // tab closed, no leave
 
     await expect(b.page.locator('.count')).toHaveText('1 online');
-    await expect(b.page.locator('.person', { hasText: 'Ana' }).locator('.crown')).toHaveCount(1);
-    await expect(b.page.locator('.person', { hasText: 'Bo' }).locator('.crown')).toHaveCount(1, { timeout: 90_000 });
+    await expect(b.page.locator('.person[data-name="Ana"]').locator('.crown')).toHaveCount(1);
+    await expect(b.page.locator('.person[data-name="Bo"]').locator('.crown')).toHaveCount(1, { timeout: 90_000 });
     await expect(b.page.locator('.toast', { hasText: "You're now the host" })).toBeVisible({ timeout: 10_000 });
   } finally {
     await b.ctx.close();
